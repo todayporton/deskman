@@ -6,6 +6,8 @@
     <string>online.todayporton.deskman</string>
     <key>CFBundleName</key>
     <string>Deskman</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleExecutable</key>
     <string>deskman</string>
     <key>CFBundlePackageType</key>
