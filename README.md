@@ -61,3 +61,7 @@ deskman rename --forget <名前>  一覧にない名前を消す
 ## 謝辞
 
 スワイプ合成の手法は [InstantSpaceSwitcher](https://github.com/jurplel/InstantSpaceSwitcher)（MIT）と [yabai](https://github.com/koekeishiya/yabai)（MIT）を参考にした。
+
+## ライセンス
+
+MIT。`LICENSE` を参照。
