@@ -199,6 +199,21 @@ final class NeighborTests: XCTestCase {
     }
 }
 
+final class VisibleOnDisplayTests: XCTestCase {
+    private let spaces = SpaceParser.parse(Fixtures.connected, activeID: 6)
+
+    func testVisibleSpaceOfCursorDisplay() {
+        // フォーカスは MAIN の m2 でも、カーソルが EXT にあれば e1
+        XCTAssertEqual(SpaceResolver.visible(onDisplay: "EXT", spaces: spaces)?.uuid, "e1")
+        XCTAssertEqual(SpaceResolver.visible(onDisplay: "ext", spaces: spaces)?.uuid, "e1")
+        XCTAssertEqual(SpaceResolver.visible(onDisplay: "MAIN", spaces: spaces)?.uuid, "m2")
+    }
+    func testUnknownDisplayFallsBackToFocus() {
+        XCTAssertEqual(SpaceResolver.visible(onDisplay: "Main", spaces: spaces)?.uuid, "m2")
+        XCTAssertEqual(SpaceResolver.visible(onDisplay: nil, spaces: spaces)?.uuid, "m2")
+    }
+}
+
 final class SwitchPlanTests: XCTestCase {
     private let spaces = SpaceParser.parse(Fixtures.connected, activeID: 6)
 

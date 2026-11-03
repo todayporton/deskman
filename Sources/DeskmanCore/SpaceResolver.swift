@@ -12,18 +12,23 @@ public enum SpaceResolver {
         throw DeskmanError.nameNotFound(query)
     }
 
+    /// 指定したディスプレイで表示中のデスクトップ。一覧にないディスプレイ（nil を含む）なら、
+    /// フォーカスのあるデスクトップを返す。
+    public static func visible(onDisplay display: String?, spaces: [Space]) -> Space? {
+        spaces.first {
+            $0.isVisible && $0.displayID.caseInsensitiveCompare(display ?? "") == .orderedSame
+        } ?? spaces.first(where: \.isActive)
+    }
+
     /// 指定したディスプレイ（nil ならフォーカスのあるディスプレイ）の中で、
     /// 表示中のデスクトップから offset 個先を返す。
     /// 他のディスプレイへは進まない。フルスクリーンも Mission Control の並びどおりに数える。
     public static func neighbor(_ offset: Int, wrap: Bool, spaces: [Space],
                                 display: String? = nil) throws -> Space {
-        guard let active = spaces.first(where: \.isActive) else {
+        guard spaces.contains(where: \.isActive),
+              let base = visible(onDisplay: display, spaces: spaces) else {
             throw DeskmanError.nameNotFound("current")
         }
-        // 一覧にないディスプレイなら、フォーカスのあるディスプレイを使う
-        let base = spaces.first {
-            $0.isVisible && $0.displayID.caseInsensitiveCompare(display ?? "") == .orderedSame
-        } ?? active
         let row = spaces.filter { $0.displayID == base.displayID }
         let here = row.firstIndex { $0.managedID == base.managedID }!
         var i = here + offset

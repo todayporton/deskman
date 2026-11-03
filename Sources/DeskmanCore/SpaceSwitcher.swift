@@ -183,11 +183,20 @@ public enum SpaceSwitcher {
 
     /// カーソルのあるディスプレイの UUID。CGSCopyManagedDisplaySpaces の Display Identifier と同じ形式。
     public static func cursorDisplayID() -> String? {
+        cursorDisplay().flatMap(displayUUID)
+    }
+
+    /// カーソルのあるディスプレイの番号。マウスが動くたびに呼べるよう、UUID は作らない。
+    public static func cursorDisplay() -> CGDirectDisplayID? {
         guard let point = CGEvent(source: nil)?.location else { return nil }
         var display: CGDirectDisplayID = 0
         var count: UInt32 = 0
-        guard CGGetDisplaysWithPoint(point, 1, &display, &count) == .success, count > 0,
-              let cf = CGDisplayCreateUUIDFromDisplayID(display)?.takeRetainedValue() else { return nil }
+        guard CGGetDisplaysWithPoint(point, 1, &display, &count) == .success, count > 0 else { return nil }
+        return display
+    }
+
+    public static func displayUUID(_ display: CGDirectDisplayID) -> String? {
+        guard let cf = CGDisplayCreateUUIDFromDisplayID(display)?.takeRetainedValue() else { return nil }
         return CFUUIDCreateString(nil, cf) as String
     }
 
@@ -196,8 +205,7 @@ public enum SpaceSwitcher {
         var count: UInt32 = 0
         guard CGGetActiveDisplayList(16, &ids, &count) == .success else { return nil }
         for display in ids.prefix(Int(count)) {
-            guard let cf = CGDisplayCreateUUIDFromDisplayID(display)?.takeRetainedValue() else { continue }
-            let uuid = CFUUIDCreateString(nil, cf) as String
+            guard let uuid = displayUUID(display) else { continue }
             if uuid.caseInsensitiveCompare(id) == .orderedSame {
                 let bounds = CGDisplayBounds(display)
                 return CGPoint(x: bounds.midX, y: bounds.midY)

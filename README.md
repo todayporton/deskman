@@ -24,6 +24,8 @@ The app is not signed with a Developer ID or notarized, so Gatekeeper blocks the
 
 Switching needs Deskman.app running and granted Accessibility access. After launching it, allow Deskman.app in System Settings > Privacy & Security > Accessibility. Choose "Launch at Login" in its menu to start it automatically.
 
+The menu bar shows the name of the desktop on the display under the cursor, and changes as soon as the cursor moves to another display. Choose "Show Icon Only" in the menu to show an icon instead of the name.
+
 `deskman go` asks the running app to switch over a local socket. Only Deskman.app needs the permission; your terminal or Herdr does not.
 
 ### Building from source

@@ -7,15 +7,71 @@ import ServiceManagement
 final class MenuBarController: NSObject, NSMenuDelegate {
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menu = NSMenu()
+    private static let iconOnlyKey = "showIconOnly"
+    /// 最後にタイトルを決めたときのカーソルのディスプレイ。変わったときだけ更新する。
+    private var lastCursorDisplay: CGDirectDisplayID?
+    private var mouseMonitor: Any?
+
+    private var iconOnly: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.iconOnlyKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.iconOnlyKey) }
+    }
 
     override init() {
         super.init()
         menu.delegate = self
         item.menu = menu
-        refreshTitle()
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(refreshTitle),
             name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(refreshTitle),
+            name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        applyDisplayMode()
+    }
+
+    private func applyDisplayMode() {
+        if iconOnly {
+            stopWatchingCursor()
+            item.button?.image = MenuBarIcon.make()
+            item.button?.title = ""
+            return
+        }
+        item.button?.image = nil
+        startWatchingCursor()
+        refreshTitle()
+    }
+
+    /// 名前を出すときだけ、カーソルがディスプレイをまたいだのを見張る。
+    /// 他のアプリに届くマウスの移動だけを受ける。自分のメニューを開いている間は見張らない
+    /// （メニューの中の移動まで処理すると、項目のハイライトが遅れる）。
+    private func startWatchingCursor() {
+        guard mouseMonitor == nil else { return }
+        let events: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged,
+                                             .rightMouseDragged, .otherMouseDragged]
+        mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: events) { [weak self] _ in
+            MainActor.assumeIsolated { self?.cursorMoved() }
+        }
+    }
+
+    private func stopWatchingCursor() {
+        if let m = mouseMonitor { NSEvent.removeMonitor(m) }
+        mouseMonitor = nil
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        stopWatchingCursor()
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        guard !iconOnly else { return }
+        startWatchingCursor()
+        refreshTitle()
+    }
+
+    private func cursorMoved() {
+        guard let display = SpaceSwitcher.cursorDisplay(), display != lastCursorDisplay else { return }
+        refreshTitle()
     }
 
     private func names() -> [String: String] {
@@ -26,8 +82,14 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         names[space.uuid] ?? (space.isFullscreen ? "Full Screen" : "Desktop \(space.index)")
     }
 
+    /// カーソルのあるディスプレイで表示中のデスクトップの名前を出す。
     @objc private func refreshTitle() {
-        guard let s = SystemSpaces.current().first(where: \.isActive) else { return }
+        guard !iconOnly else { return }
+        let display = SpaceSwitcher.cursorDisplay()
+        lastCursorDisplay = display
+        let spaces = SystemSpaces.current()
+        guard let s = SpaceResolver.visible(onDisplay: display.flatMap(SpaceSwitcher.displayUUID),
+                                            spaces: spaces) else { return }
         item.button?.title = title(for: s, names: names())
     }
 
@@ -57,11 +119,20 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                                 action: #selector(renameCurrent), keyEquivalent: "")
         rename.target = self
         menu.addItem(rename)
+        let iconItem = NSMenuItem(title: "Show Icon Only", action: #selector(toggleIconOnly), keyEquivalent: "")
+        iconItem.target = self
+        iconItem.state = iconOnly ? .on : .off
+        menu.addItem(iconItem)
         let login = NSMenuItem(title: "Launch at Login", action: #selector(toggleLogin), keyEquivalent: "")
         login.target = self
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(login)
         menu.addItem(NSMenuItem(title: "Quit Deskman", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+    }
+
+    @objc private func toggleIconOnly() {
+        iconOnly.toggle()
+        applyDisplayMode()
     }
 
     @objc private func toggleLogin() {
