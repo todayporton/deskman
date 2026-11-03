@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/images/icon.png" width="128" height="128" alt="Deskman icon"></p>
+
 # deskman
 
 English | [日本語](README.ja.md)
