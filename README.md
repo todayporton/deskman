@@ -1,0 +1,57 @@
+# deskman
+
+macOS のデスクトップ（Spaces）に名前を付けて、名前で瞬時に移動する小さなツール。名前は各デスクトップの UUID に紐づくので、並べ替えや増減があってもずれない。
+
+## インストール
+
+```sh
+bash scripts/bundle.sh
+cp -R dist/Deskman.app /Applications/
+ln -s /Applications/Deskman.app/Contents/MacOS/deskman ~/.local/bin/deskman
+```
+
+移動には Deskman.app の常駐とアクセシビリティ権限が必要。`open /Applications/Deskman.app` で起動し、システム設定 > プライバシーとセキュリティ > アクセシビリティ で Deskman.app を許可する。メニューの「ログイン時に起動」で自動起動にできる。
+
+`deskman go` はローカルソケットで常駐アプリに移動を依頼する。権限は Deskman.app だけにあればよく、ターミナルや Herdr には不要。`scripts/bundle.sh` の既定はアドホック署名で、再ビルドして置き換えると許可し直しが必要になることがある。`CODESIGN_IDENTITY="証明書の名前" bash scripts/bundle.sh` のように自分の証明書で署名すれば、再ビルドしても同じアプリとして扱われる想定。Developer ID 署名と公証はしていないので、ビルド済みのアプリの配布には向かない。
+
+## 使い方
+
+```
+deskman                         メニューバーアプリとして起動
+deskman list [--json] [--all]   一覧（* は現在地、+ は他のディスプレイで表示中）
+deskman current [--json]        現在のデスクトップ
+deskman go [--restore-cursor] <名前|番号|UUID>
+                                移動。--restore-cursor は別ディスプレイへの移動後にカーソルを元の位置へ戻す
+deskman rename <対象> <名前>    名前を付ける（"" で解除）
+deskman rename --forget <名前>  一覧にない名前を消す
+```
+
+番号は今の並びの順番なので、並べ替えるとずれる。ずらしたくない呼び出しでは名前か UUID を使う。
+
+## 終了コード
+
+| コード | 意味 |
+|---|---|
+| 0 | 成功 |
+| 1 | その他のエラー |
+| 2 | 見つからない |
+| 3 | 今の一覧にない（ディスプレイが外れている、または削除された） |
+| 4 | アクセシビリティ権限がない |
+| 5 | 移動を確認できない |
+| 6 | 名前の重複 |
+| 7 | Deskman.app が起動していない |
+| 64 | 引数の誤り |
+
+## 制限
+
+- macOS の非公式 API（`CGSCopyManagedDisplaySpaces`、Dock スワイプの合成）に依存するので、macOS の更新で動かなくなることがある。macOS 27 のイベント形式には未対応。
+- UUID が空のデスクトップには名前を付けられない。
+- 別ディスプレイへの移動では、既定でカーソルも移動先へ動く。
+
+## データ
+
+`~/.config/deskman/` に保存する。消すにはこのフォルダを削除する。
+
+## 謝辞
+
+スワイプ合成の手法は [InstantSpaceSwitcher](https://github.com/jurplel/InstantSpaceSwitcher)（MIT）と [yabai](https://github.com/koekeishiya/yabai)（MIT）を参考にした。
