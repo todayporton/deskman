@@ -246,6 +246,7 @@ final class GoSocketTests: XCTestCase {
         XCTAssertEqual(r, GoRequest(query: "a", restoreCursor: false))
         XCTAssertNil(r.offset)
         XCTAssertNil(r.byCursor)
+        XCTAssertNil(r.restoreFocus)
     }
     func testSuccessAndRemoteFailureCarryExitCode() throws {
         let p = path()

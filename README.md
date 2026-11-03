@@ -20,17 +20,19 @@ ln -s /Applications/Deskman.app/Contents/MacOS/deskman ~/.local/bin/deskman
 deskman                         メニューバーアプリとして起動
 deskman list [--json] [--all]   一覧（* は現在地、+ は他のディスプレイで表示中）
 deskman current [--json]        現在のデスクトップ
-deskman go [--restore-cursor] <名前|番号|UUID>
-                                移動。--restore-cursor は別ディスプレイへの移動後にカーソルを元の位置へ戻す
-deskman next [--wrap] [--cursor] [--restore-cursor]
+deskman go [--restore-cursor] [--restore-focus] <名前|番号|UUID>
+                                移動
+deskman next [--wrap] [--cursor] [--restore-cursor] [--restore-focus]
                                 右隣へ移動
-deskman prev [--wrap] [--cursor] [--restore-cursor]
+deskman prev [--wrap] [--cursor] [--restore-cursor] [--restore-focus]
                                 左隣へ移動
 deskman rename <対象> <名前>    名前を付ける（"" で解除）
 deskman rename --forget <名前>  一覧にない名前を消す
 ```
 
 `next` と `prev` は、既定ではアクティブなウィンドウのあるディスプレイで、`--cursor` を付けるとカーソルのあるディスプレイで隣へ移動する。他のディスプレイへは進まず、端では終了コード 2 で失敗する。`--wrap` を付けると反対の端へ回り込む。フルスクリーンのデスクトップも並びどおりに数える。連続で呼ぶと、呼んだ回数だけ進む。
+
+`--restore-cursor` は、移動のためにカーソルを別のディスプレイへ動かした場合に、移動後に元の位置へ戻す。`--restore-focus` は、移動でキーボードのフォーカスが他のウィンドウへ移った場合に、移動前のウィンドウへ戻す。戻すのは移動前のウィンドウが画面に出ているときだけで、移動のコマンドはフォーカスを戻すのを待たずに終わる。次の移動が始まると、戻す処理は取りやめる。
 
 番号は今の並びの順番なので、並べ替えるとずれる。ずらしたくない呼び出しでは名前か UUID を使う。
 

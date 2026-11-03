@@ -9,14 +9,17 @@ public struct GoRequest: Codable, Equatable, Sendable {
     public let wrap: Bool?
     /// offset を数えるディスプレイを、フォーカスではなくカーソルのある側にする。
     public let byCursor: Bool?
+    /// 移動でキーボードのフォーカスが他のアプリへ移ったら、移動前のウィンドウへ戻す。
+    public let restoreFocus: Bool?
 
     public init(query: String, restoreCursor: Bool, offset: Int? = nil, wrap: Bool? = nil,
-                byCursor: Bool? = nil) {
+                byCursor: Bool? = nil, restoreFocus: Bool? = nil) {
         self.query = query
         self.restoreCursor = restoreCursor
         self.offset = offset
         self.wrap = wrap
         self.byCursor = byCursor
+        self.restoreFocus = restoreFocus
     }
 }
 
@@ -161,7 +164,8 @@ public enum GoSocket {
             } else {
                 try SpaceResolver.resolve(request.query, spaces: spaces, names: NameStore().names)
             }
-            try SpaceSwitcher.go(to: target, restoreCursor: request.restoreCursor)
+            try SpaceSwitcher.go(to: target, restoreCursor: request.restoreCursor,
+                                 restoreFocus: request.restoreFocus ?? false)
             return GoReply(code: 0, message: "")
         } catch let error as DeskmanError {
             return GoReply(code: error.exitCode, message: error.message)

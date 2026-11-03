@@ -45,6 +45,7 @@ func runCLI(_ arguments: [String]) throws {
         }
     case "go":
         let restoreCursor = flag("--restore-cursor")
+        let restoreFocus = flag("--restore-focus")
         guard let query = args.first else { usage() }
         // 間違った名前なら順番待ちせずに失敗させる
         _ = try SpaceResolver.resolve(query, spaces: spaces, names: store.names)
@@ -52,12 +53,14 @@ func runCLI(_ arguments: [String]) throws {
         let ticket = try queue.takeTicket()
         try queue.withRunLock {
             guard try queue.isLatest(ticket) else { return }
-            try GoSocket.send(GoRequest(query: query, restoreCursor: restoreCursor))
+            try GoSocket.send(GoRequest(query: query, restoreCursor: restoreCursor,
+                                        restoreFocus: restoreFocus))
         }
     case "next", "prev":
         let wrap = flag("--wrap")
         let byCursor = flag("--cursor")
         let restoreCursor = flag("--restore-cursor")
+        let restoreFocus = flag("--restore-focus")
         guard args.isEmpty else { usage() }
         // 移動先は常駐アプリが処理する時点の並びで決める。連続で呼ばれた回数だけ進めたいので、
         // go と違って古い要求を捨てずに順番に送る。札は取って、待っている go を取り消す。
@@ -66,7 +69,7 @@ func runCLI(_ arguments: [String]) throws {
         try queue.withRunLock {
             try GoSocket.send(GoRequest(query: "", restoreCursor: restoreCursor,
                                         offset: command == "next" ? 1 : -1, wrap: wrap,
-                                        byCursor: byCursor))
+                                        byCursor: byCursor, restoreFocus: restoreFocus))
         }
     case "rename":
         if flag("--forget") {
@@ -90,10 +93,10 @@ func usage() -> Never {
       deskman                         メニューバーアプリとして起動
       deskman list [--json] [--all]
       deskman current [--json]
-      deskman go [--restore-cursor] <名前|番号|UUID>
-      deskman next [--wrap] [--cursor] [--restore-cursor]
+      deskman go [--restore-cursor] [--restore-focus] <名前|番号|UUID>
+      deskman next [--wrap] [--cursor] [--restore-cursor] [--restore-focus]
                                       右隣へ。--cursor はカーソルのあるディスプレイで数える
-      deskman prev [--wrap] [--cursor] [--restore-cursor]
+      deskman prev [--wrap] [--cursor] [--restore-cursor] [--restore-focus]
                                       左隣へ
       deskman rename <対象> <名前>     "" で解除
       deskman rename --forget <名前>
