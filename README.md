@@ -22,7 +22,7 @@ The app is not signed with a Developer ID or notarized, so Gatekeeper blocks the
 2. Open System Settings > Privacy & Security and click "Open Anyway" near the bottom.
 3. Click "Open Anyway" again in the confirmation dialog and enter your password.
 
-Switching needs Deskman.app running and granted Accessibility access. After launching it, allow Deskman.app in System Settings > Privacy & Security > Accessibility. Choose "ログイン時に起動" (Launch at Login) in its menu to start it automatically. The menu and messages are in Japanese.
+Switching needs Deskman.app running and granted Accessibility access. After launching it, allow Deskman.app in System Settings > Privacy & Security > Accessibility. Choose "Launch at Login" in its menu to start it automatically.
 
 `deskman go` asks the running app to switch over a local socket. Only Deskman.app needs the permission; your terminal or Herdr does not.
 

@@ -26,7 +26,7 @@ pkill -x deskman; sleep 1; open dist/Deskman.app                 # 開発版で�
 pkill -x deskman; sleep 1; open /Applications/Deskman.app        # brew 版に戻す
 ```
 
-- 開発版を起動している間は、メニューの「ログイン時に起動」を切り替えない。切り替えると、ログイン項目が `dist/` の方に登録されることがある。
+- 開発版を起動している間は、メニューの「Launch at Login」を切り替えない。切り替えると、ログイン項目が `dist/` の方に登録されることがある。
 
 - 実際にデスクトップが切り替わる操作（`deskman go`、`spike/`）を、開発中にホストの Mac で自動実行しない。`macvm` スキルで VM で確認する。ホストで実行してよいのは `list` と `current` だけ。
 - VM は他のセッションと共有している。`macvm lock-status` を確認し、他のセッションがロックを持っているときは切り替えを実行せず、強制解除もしない。

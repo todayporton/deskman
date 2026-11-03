@@ -29,8 +29,8 @@ func runCLI(_ arguments: [String]) throws {
         for r in rows {
             let mark = r.active ? "*" : (r.visible ? "+" : " ")
             let index = r.index.map(String.init) ?? "-"
-            let note = !r.present ? "（一覧になし）" : (r.fullscreen ? "（フルスクリーン）" : "")
-            print("\(mark) \(index)\t\(r.name ?? "-")\t\(r.display ?? "-")\t\(r.uuid.isEmpty ? "(UUIDなし)" : r.uuid)\(note)")
+            let note = !r.present ? " (not in list)" : (r.fullscreen ? " (full screen)" : "")
+            print("\(mark) \(index)\t\(r.name ?? "-")\t\(r.display ?? "-")\t\(r.uuid.isEmpty ? "(no UUID)" : r.uuid)\(note)")
         }
     case "current":
         let asJSON = flag("--json")
@@ -89,17 +89,17 @@ func runCLI(_ arguments: [String]) throws {
 
 func usage() -> Never {
     FileHandle.standardError.write(Data("""
-    使い方:
-      deskman                         メニューバーアプリとして起動
+    Usage:
+      deskman                         Run as a menu bar app
       deskman list [--json] [--all]
       deskman current [--json]
-      deskman go [--restore-cursor] [--restore-focus] <名前|番号|UUID>
+      deskman go [--restore-cursor] [--restore-focus] <name|number|UUID>
       deskman next [--wrap] [--cursor] [--restore-cursor] [--restore-focus]
-                                      右隣へ。--cursor はカーソルのあるディスプレイで数える
+                                      Switch to the desktop on the right. --cursor uses the display under the cursor
       deskman prev [--wrap] [--cursor] [--restore-cursor] [--restore-focus]
-                                      左隣へ
-      deskman rename <対象> <名前>     "" で解除
-      deskman rename --forget <名前>
+                                      Switch to the desktop on the left
+      deskman rename <target> <name>  "" removes the name
+      deskman rename --forget <name>
 
     """.utf8))
     exit(64)

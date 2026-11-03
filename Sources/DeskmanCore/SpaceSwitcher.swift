@@ -53,9 +53,9 @@ public enum SpaceSwitcher {
         let focus = restoreFocus ? Focus.current() : nil
         if restoreFocus {
             if let focus {
-                log.info("記録: pid=\(focus.pid, privacy: .public) window=\(focus.windowID.map(String.init) ?? "nil", privacy: .public) element=\(focus.window != nil, privacy: .public)")
+                log.info("Saved: pid=\(focus.pid, privacy: .public) window=\(focus.windowID.map(String.init) ?? "nil", privacy: .public) element=\(focus.window != nil, privacy: .public)")
             } else {
-                log.info("記録できず: フォーカスのあるアプリを取れない")
+                log.info("Not saved: could not get the focused app")
             }
         }
         // スワイプはカーソルのあるディスプレイに効くので、カーソルが別のディスプレイにあれば先に移す。
@@ -115,21 +115,21 @@ public enum SpaceSwitcher {
         func ms() -> Int { Int(Date().timeIntervalSince(start) * 1000) }
         var now = Focus.current()
         while before.isSame(now) {
-            guard isCurrent(gen) else { return log.info("中止: 次の移動が始まった (\(ms())ms)") }
-            guard Date() < deadline else { return log.info("フォーカスは移らなかった (\(ms())ms)") }
+            guard isCurrent(gen) else { return log.info("Cancelled: a new switch started (\(ms())ms)") }
+            guard Date() < deadline else { return log.info("Focus did not move (\(ms())ms)") }
             usleep(5000)
             now = Focus.current()
         }
-        log.info("移った: pid=\(now?.pid ?? -1, privacy: .public) window=\(now?.windowID.map(String.init) ?? "nil", privacy: .public) (\(ms())ms)")
+        log.info("Moved: pid=\(now?.pid ?? -1, privacy: .public) window=\(now?.windowID.map(String.init) ?? "nil", privacy: .public) (\(ms())ms)")
         // 画面に出ていないウィンドウを前に出すと、macOS がデスクトップを戻してしまう。
         // ウィンドウ ID が取れないアプリは、そのアプリのウィンドウが画面に出ているかで判定する。
         // 移動の直後は一覧の更新が遅れることも考えて、締め切りまでは待つ
         while !isOnScreen(windowID: before.windowID, pid: before.pid) {
-            guard isCurrent(gen) else { return log.info("中止: 次の移動が始まった (\(ms())ms)") }
-            guard Date() < deadline else { return log.info("戻さない: 元のウィンドウが画面に出ていない (\(ms())ms)") }
+            guard isCurrent(gen) else { return log.info("Cancelled: a new switch started (\(ms())ms)") }
+            guard Date() < deadline else { return log.info("Not restored: the previous window is not on screen (\(ms())ms)") }
             usleep(5000)
         }
-        guard isCurrent(gen) else { return log.info("中止: 次の移動が始まった (\(ms())ms)") }
+        guard isCurrent(gen) else { return log.info("Cancelled: a new switch started (\(ms())ms)") }
         let front = AXUIElementSetAttributeValue(AXUIElementCreateApplication(before.pid),
                                                  kAXFrontmostAttribute as CFString, kCFBooleanTrue)
         var main = AXError.noValue
@@ -138,10 +138,10 @@ public enum SpaceSwitcher {
             main = AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
             raise = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
         }
-        log.info("戻した: frontmost=\(front.rawValue, privacy: .public) main=\(main.rawValue, privacy: .public) raise=\(raise.rawValue, privacy: .public) (\(ms())ms)")
+        log.info("Restored: frontmost=\(front.rawValue, privacy: .public) main=\(main.rawValue, privacy: .public) raise=\(raise.rawValue, privacy: .public) (\(ms())ms)")
         usleep(50000)
         let after = Focus.current()
-        log.info("50ms 後: pid=\(after?.pid ?? -1, privacy: .public) window=\(after?.windowID.map(String.init) ?? "nil", privacy: .public) 戻った=\(before.isSame(after), privacy: .public)")
+        log.info("After 50ms: pid=\(after?.pid ?? -1, privacy: .public) window=\(after?.windowID.map(String.init) ?? "nil", privacy: .public) restored=\(before.isSame(after), privacy: .public)")
     }
 
     private static func isOnScreen(windowID: CGWindowID?, pid: pid_t) -> Bool {

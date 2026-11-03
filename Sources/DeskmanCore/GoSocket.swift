@@ -145,7 +145,7 @@ public enum GoSocket {
                 if let request = try? JSONDecoder().decode(GoRequest.self, from: readAll(client)) {
                     reply = handler(request)
                 } else {
-                    reply = GoReply(code: 1, message: "要求を読めませんでした。")
+                    reply = GoReply(code: 1, message: "Could not read the request.")
                 }
                 if let data = try? JSONEncoder().encode(reply) { writeAll(client, data) }
                 close(client)

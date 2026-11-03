@@ -23,7 +23,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private func title(for space: Space, names: [String: String]) -> String {
-        names[space.uuid] ?? (space.isFullscreen ? "フルスクリーン" : "デスクトップ \(space.index)")
+        names[space.uuid] ?? (space.isFullscreen ? "Full Screen" : "Desktop \(space.index)")
     }
 
     @objc private func refreshTitle() {
@@ -40,7 +40,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             if s.displayID != lastDisplay {
                 if lastDisplay != nil { menu.addItem(.separator()) }
                 displayNumber += 1
-                let header = NSMenuItem(title: "ディスプレイ \(displayNumber)", action: nil, keyEquivalent: "")
+                let header = NSMenuItem(title: "Display \(displayNumber)", action: nil, keyEquivalent: "")
                 header.isEnabled = false
                 menu.addItem(header)
                 lastDisplay = s.displayID
@@ -53,15 +53,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             menu.addItem(row)
         }
         menu.addItem(.separator())
-        let rename = NSMenuItem(title: "現在のデスクトップの名前を変更…",
+        let rename = NSMenuItem(title: "Rename Current Desktop…",
                                 action: #selector(renameCurrent), keyEquivalent: "")
         rename.target = self
         menu.addItem(rename)
-        let login = NSMenuItem(title: "ログイン時に起動", action: #selector(toggleLogin), keyEquivalent: "")
+        let login = NSMenuItem(title: "Launch at Login", action: #selector(toggleLogin), keyEquivalent: "")
         login.target = self
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(login)
-        menu.addItem(NSMenuItem(title: "終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: "Quit Deskman", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
 
     @objc private func toggleLogin() {
@@ -96,10 +96,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             return
         }
         let alert = NSAlert()
-        alert.messageText = "デスクトップの名前"
-        alert.informativeText = "空にすると名前を解除します。"
-        alert.addButton(withTitle: "保存")
-        alert.addButton(withTitle: "キャンセル")
+        alert.messageText = "Desktop Name"
+        alert.informativeText = "Leave empty to remove the name."
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
         field.stringValue = names()[s.uuid] ?? ""
         alert.accessoryView = field
@@ -134,7 +134,7 @@ func runMenuBar() -> Never {
             }
         }
     } catch {
-        FileHandle.standardError.write(Data("ソケットを開けませんでした: \(error)\n".utf8))
+        FileHandle.standardError.write(Data("Could not open the socket: \(error)\n".utf8))
         exit(1)
     }
     let promptKey = "AXTrustedCheckOptionPrompt" as CFString

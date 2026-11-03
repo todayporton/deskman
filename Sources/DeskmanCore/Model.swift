@@ -52,17 +52,17 @@ public enum DeskmanError: Error, Equatable {
 
     public var message: String {
         switch self {
-        case .serverNotRunning: "Deskman.app が起動していません。移動には起動が必要です: open /Applications/Deskman.app"
+        case .serverNotRunning: "Deskman.app is not running. It must be running to switch desktops: open /Applications/Deskman.app"
         case .remote(_, let message): message
-        case .nameNotFound(let q): "見つかりません: \(q)"
-        case .noNeighbor(let offset): offset > 0 ? "これより右にデスクトップはありません。" : "これより左にデスクトップはありません。"
-        case .notInList(let q): "\(q) は今の一覧にありません。ディスプレイが外れている可能性があります。"
-        case .notTrusted: "アクセシビリティ権限が必要です。システム設定 > プライバシーとセキュリティ > アクセシビリティ で Deskman.app を許可してください。"
-        case .switchNotConfirmed: "移動を確認できませんでした。"
-        case .duplicateName(let n): "すでに使われている名前です: \(n)"
-        case .fullscreenNotNameable: "フルスクリーンのデスクトップには名前を付けられません。"
-        case .noUUID: "このデスクトップにはまだ UUID がないので、名前を付けられません。デスクトップを追加すると割り当てられることがあります。"
-        case .hasLiveSpace(let n): "\(n) は今の一覧にあるので消せません。解除するには rename <対象> \"\" を使ってください。"
+        case .nameNotFound(let q): "Not found: \(q)"
+        case .noNeighbor(let offset): offset > 0 ? "There is no desktop to the right." : "There is no desktop to the left."
+        case .notInList(let q): "\(q) is not in the current list. Its display may be disconnected."
+        case .notTrusted: "Accessibility permission is required. Allow Deskman.app in System Settings > Privacy & Security > Accessibility."
+        case .switchNotConfirmed: "Could not confirm the switch."
+        case .duplicateName(let n): "Name already in use: \(n)"
+        case .fullscreenNotNameable: "Full-screen desktops cannot be named."
+        case .noUUID: "This desktop has no UUID yet, so it cannot be named. Adding a desktop may assign one."
+        case .hasLiveSpace(let n): "\(n) is in the current list, so it cannot be forgotten. To remove the name, use rename <target> \"\"."
         }
     }
 
