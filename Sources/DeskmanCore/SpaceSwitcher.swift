@@ -11,7 +11,7 @@ private func _AXUIElementGetWindow(_ element: AXUIElement, _ id: UnsafeMutablePo
 ///
 /// 進捗をほぼ 0 にしてアニメーションする距離をなくす手法は InstantSpaceSwitcher (MIT) を参考にした。
 /// VM (macOS 26.6.2) の実測では、3つ先への移動も途中を経由せず約 50ms で完了した。
-/// macOS 27 ではイベントの形式が変わると InstantSpaceSwitcher に記載があり、そこは未対応。
+/// macOS 27 では形式が変わるため、別の組み立て方（`MacOS27`）で送る。
 public enum SpaceSwitcher {
     private static let progress = 0.000016
     private static let velocity = 2000.0
@@ -161,6 +161,9 @@ public enum SpaceSwitcher {
     }
 
     private static func postSwipes(_ steps: Int) {
+        if #available(macOS 27, *) {
+            return MacOS27.postSwipes(steps)
+        }
         let sign: Double = steps > 0 ? 1 : -1
         for _ in 0..<abs(steps) {
             // Began、Changed、Ended の3段階を送る
@@ -212,5 +215,113 @@ public enum SpaceSwitcher {
             usleep(2000)
         }
         throw DeskmanError.switchNotConfirmed
+    }
+}
+
+extension SpaceSwitcher {
+    /// macOS 27 以降のスワイプ合成。
+    ///
+    /// Raycast 2.10.1 の `setCurrentSpaceWithoutAnimation(at:)` を逆アセンブルして読んだ形式をなぞる。
+    /// macOS 27 では、フィールドを設定するだけでなく、シリアライズしたイベントの末尾に
+    /// HID の DockSwipe イベント（タグ 4205）を足して作り直している。
+    /// macOS 27 の環境がないため、実際に切り替わるかは未確認。
+    enum MacOS27 {
+        static let hidEventTag: UInt16 = 4205
+        static let progress = 0.000016
+        static let velocity = 9999.0
+
+        static func postSwipes(_ steps: Int) {
+            let direction = steps > 0 ? fingerSign() : -fingerSign()
+            for _ in 0..<abs(steps) {
+                for phase: Int64 in [1, 2, 4] {
+                    guard let e = event(phase: phase, direction: direction),
+                          let companion = CGEvent(source: nil) else { return }
+                    companion.setIntegerValueField(field(55), value: 29)  // Gesture
+                    e.post(tap: .cgSessionEventTap)
+                    companion.post(tap: .cgSessionEventTap)
+                }
+            }
+        }
+
+        /// ナチュラルスクロールが有効（未設定も含む）なら −1。Raycast と同じ扱い。
+        static func fingerSign() -> Double {
+            let natural = CFPreferencesCopyAppValue("com.apple.swipescrolldirection" as CFString,
+                                                    kCFPreferencesAnyApplication) as? Bool
+            return natural ?? true ? -1 : 1
+        }
+
+        static func event(phase: Int64, direction: Double) -> CGEvent? {
+            guard let e = CGEvent(source: nil) else { return nil }
+            let p = direction * progress
+            e.setIntegerValueField(field(55), value: 30)  // DockControl
+            e.setIntegerValueField(field(110), value: 23)  // DockSwipe
+            e.setIntegerValueField(field(132), value: phase)
+            e.setIntegerValueField(field(134), value: phase)
+            e.setIntegerValueField(field(135), value: Int64(Int32(bitPattern: Float(p).bitPattern)))
+            e.setIntegerValueField(field(123), value: 1)  // 水平
+            e.setIntegerValueField(field(115), value: 0)
+            e.setDoubleValueField(field(124), value: p)
+            e.setDoubleValueField(field(125), value: 0.1)
+            e.setDoubleValueField(field(126), value: 0)
+            if phase == 4 {
+                e.setDoubleValueField(field(129), value: direction * velocity)
+            }
+            e.setDoubleValueField(field(130), value: 0)
+            e.setDoubleValueField(field(138), value: 3)
+            e.setDoubleValueField(field(169), value: Double(mach_absolute_time()))
+            guard let serialized = e.data as Data? else { return nil }
+            var data = serialized
+            appendRecord(tag: hidEventTag,
+                         payload: hidPayload(phase: phase, progress: p, timestamp: mach_absolute_time()),
+                         to: &data)
+            return CGEvent(withDataAllocator: nil, data: data as CFData)
+        }
+
+        /// シリアライズしたイベントの末尾に、長さとタグ（どちらも 2 バイトの big-endian）と中身を足す。
+        static func appendRecord(tag: UInt16, payload: Data, to data: inout Data) {
+            precondition(payload.count <= Int(UInt16.max))
+            append(UInt16(payload.count).bigEndian, to: &data)
+            append((tag & 0x3fff).bigEndian, to: &data)
+            data.append(payload)
+        }
+
+        /// HID の DockSwipe イベント 1 個をシリアライズしたもの（68 バイト、little-endian）。
+        /// 並びは IOKit の IOHIDEventData（size, type, options, depth）と一致する。
+        static func hidPayload(phase: Int64, progress: Double, timestamp: UInt64) -> Data {
+            var d = Data()
+            // ヘッダ
+            append(timestamp.littleEndian, to: &d)
+            append(UInt64(0), to: &d)  // senderID
+            append(UInt32(0), to: &d)  // options
+            append(UInt32(0), to: &d)  // 属性の長さ
+            append(UInt32(1).littleEndian, to: &d)  // イベントの数
+            // DockSwipe イベント
+            append(UInt32(40).littleEndian, to: &d)  // size
+            append(UInt32(23).littleEndian, to: &d)  // type: DockSwipe
+            append((UInt32(truncatingIfNeeded: phase) << 24).littleEndian, to: &d)  // options: 段階
+            d.append(contentsOf: [0, 0, 0, 0])  // depth, reserved
+            append(ioFixed(0.1).littleEndian, to: &d)
+            append(Int32(0), to: &d)
+            append(Int32(0), to: &d)
+            append(Int32(0), to: &d)
+            append(UInt16(1).littleEndian, to: &d)
+            append(UInt16(3).littleEndian, to: &d)
+            append(ioFixed(progress).littleEndian, to: &d)
+            return d
+        }
+
+        /// 16.16 の固定小数点。0 でない値が 0 に丸められるときは ±1 にする（Raycast と同じ）。
+        static func ioFixed(_ value: Double) -> Int32 {
+            let scaled = (value * 65536).rounded(.towardZero)
+            if scaled >= Double(Int32.max) { return .max }
+            if scaled <= Double(Int32.min) { return .min }
+            let fixed = Int32(scaled)
+            if fixed == 0, value != 0 { return value > 0 ? 1 : -1 }
+            return fixed
+        }
+
+        private static func append<T: FixedWidthInteger>(_ value: T, to data: inout Data) {
+            withUnsafeBytes(of: value) { data.append(contentsOf: $0) }
+        }
     }
 }

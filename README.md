@@ -70,7 +70,7 @@ deskman rename --forget <名前>  一覧にない名前を消す
 
 ## 制限
 
-- macOS の非公式 API（`CGSCopyManagedDisplaySpaces`、Dock スワイプの合成）に依存するので、macOS の更新で動かなくなることがある。macOS 27 のイベント形式には未対応。
+- macOS の非公式 API（`CGSCopyManagedDisplaySpaces`、Dock スワイプの合成）に依存するので、macOS の更新で動かなくなることがある。macOS 27 で変わったイベントの形式にも対応したが、macOS 27 では動作を確認していない。
 - UUID が空のデスクトップには名前を付けられない。
 - スワイプはカーソルのあるディスプレイに効くので、カーソルが移動先と別のディスプレイにあるときは、既定でカーソルも移動先へ動く。`--restore-cursor` で元に戻せる。
 

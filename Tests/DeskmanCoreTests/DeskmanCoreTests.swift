@@ -286,3 +286,58 @@ final class SpaceRowTests: XCTestCase {
         XCTAssertEqual(SpaceRow.make(spaces: s, names: ["e1": "資料"], includeAbsent: false).count, 3)
     }
 }
+
+/// macOS 27 用の形式。期待値は Raycast 2.10.1 の逆アセンブルから読んだもの。
+final class MacOS27SwipeTests: XCTestCase {
+    typealias M = SpaceSwitcher.MacOS27
+
+    func testIOFixed() {
+        XCTAssertEqual(M.ioFixed(0.1), 0x1999)
+        XCTAssertEqual(M.ioFixed(1), 65536)
+        XCTAssertEqual(M.ioFixed(0), 0)
+        // 0.000016 × 65536 ≈ 1.05 は切り捨てて 1
+        XCTAssertEqual(M.ioFixed(0.000016), 1)
+        XCTAssertEqual(M.ioFixed(-0.000016), -1)
+        // 0 に丸められても 0 でない値は ±1
+        XCTAssertEqual(M.ioFixed(1e-9), 1)
+        XCTAssertEqual(M.ioFixed(-1e-9), -1)
+        XCTAssertEqual(M.ioFixed(1e10), .max)
+        XCTAssertEqual(M.ioFixed(-1e10), .min)
+    }
+
+    func testHIDPayload() {
+        let d = M.hidPayload(phase: 2, progress: -0.000016, timestamp: 0x1122334455667788)
+        XCTAssertEqual(d.count, 68)
+        XCTAssertEqual([UInt8](d), [
+            0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11,  // timestamp
+            0, 0, 0, 0, 0, 0, 0, 0,  // senderID
+            0, 0, 0, 0,  // options
+            0, 0, 0, 0,  // 属性の長さ
+            1, 0, 0, 0,  // イベントの数
+            40, 0, 0, 0,  // size
+            23, 0, 0, 0,  // type
+            0, 0, 0, 2,  // options: 段階 << 24
+            0, 0, 0, 0,  // depth, reserved
+            0x99, 0x19, 0, 0,  // 0.1
+            0, 0, 0, 0,
+            0, 0, 0, 0,
+            0, 0, 0, 0,
+            1, 0, 3, 0,
+            0xff, 0xff, 0xff, 0xff,  // 進捗 −1/65536
+        ])
+    }
+
+    func testAppendRecord() {
+        var data = Data([0xaa])
+        M.appendRecord(tag: 4205, payload: Data([1, 2, 3]), to: &data)
+        XCTAssertEqual([UInt8](data), [0xaa, 0x00, 0x03, 0x10, 0x6d, 1, 2, 3])
+    }
+
+    /// 足したイベントを CoreGraphics が読み戻せること。送信はしない。
+    func testEventRoundTrips() throws {
+        let e = try XCTUnwrap(M.event(phase: 1, direction: 1))
+        XCTAssertEqual(e.getIntegerValueField(CGEventField(rawValue: 55)!), 30)
+        XCTAssertEqual(e.getIntegerValueField(CGEventField(rawValue: 132)!), 1)
+        XCTAssertEqual(e.getDoubleValueField(CGEventField(rawValue: 124)!), 0.000016, accuracy: 1e-12)
+    }
+}
