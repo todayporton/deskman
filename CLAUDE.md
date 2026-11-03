@@ -1,6 +1,6 @@
 # deskman
 
-macOS のデスクトップに名前を付けて瞬時に移動するツール。使い方と終了コードは `README.md`、設計の経緯と実測結果は `docs/plans/2026-11-03-deskman-design.md` を参照する。`docs/plans/2026-11-03-deskman.md` は当初の実装計画で、コードの正は `Sources/`。
+macOS のデスクトップに名前を付けて瞬時に移動するツール。使い方と終了コードは `README.md`（英語）、日本語版は `README.ja.md` で、変えるときは両方を直す。設計の経緯と実測結果は `docs/plans/2026-11-03-deskman-design.md` を参照する。`docs/plans/2026-11-03-deskman.md` は当初の実装計画で、コードの正は `Sources/`。
 
 ## 構成
 

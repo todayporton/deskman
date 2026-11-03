@@ -1,28 +1,30 @@
 # deskman
 
-macOS のデスクトップ（Spaces）に名前を付けて、名前で瞬時に移動する小さなツール。名前は各デスクトップの UUID に紐づくので、並べ替えや増減があってもずれない。
+English | [日本語](README.ja.md)
 
-## インストール
+A small tool that names macOS desktops (Spaces) and switches to them instantly by name. Names are tied to each desktop's UUID, so they stay correct when desktops are reordered, added or removed.
 
-Homebrew で入れる。macOS 14 以降、Apple Silicon 専用。
+## Installation
+
+Install with Homebrew. Requires macOS 14 or later on Apple Silicon.
 
 ```sh
 brew install --cask todayporton/tap/deskman
 ```
 
-Deskman.app が `/Applications` に、`deskman` コマンドが Homebrew の bin に入る。
+This puts Deskman.app in `/Applications` and the `deskman` command in Homebrew's bin directory.
 
-Developer ID の署名と公証はしていないので、初回の起動は Gatekeeper に止められる。次の手順で開く。
+The app is not signed with a Developer ID or notarized, so Gatekeeper blocks the first launch. To open it:
 
-1. 開けなかったことを知らせるダイアログで「完了」を押す。
-2. システム設定 > プライバシーとセキュリティ の下のほうにある「このまま開く」を押す。
-3. 確認のダイアログでもう一度「このまま開く」を押し、パスワードを入力する。
+1. Click "Done" in the dialog saying the app could not be opened.
+2. Open System Settings > Privacy & Security and click "Open Anyway" near the bottom.
+3. Click "Open Anyway" again in the confirmation dialog and enter your password.
 
-移動には Deskman.app の常駐とアクセシビリティ権限が必要。起動したら、システム設定 > プライバシーとセキュリティ > アクセシビリティ で Deskman.app を許可する。メニューの「ログイン時に起動」で自動起動にできる。
+Switching needs Deskman.app running and granted Accessibility access. After launching it, allow Deskman.app in System Settings > Privacy & Security > Accessibility. Choose "ログイン時に起動" (Launch at Login) in its menu to start it automatically. The menu and messages are in Japanese.
 
-`deskman go` はローカルソケットで常駐アプリに移動を依頼する。権限は Deskman.app だけにあればよく、ターミナルや Herdr には不要。
+`deskman go` asks the running app to switch over a local socket. Only Deskman.app needs the permission; your terminal or Herdr does not.
 
-### ソースからビルドする
+### Building from source
 
 ```sh
 bash scripts/bundle.sh
@@ -30,58 +32,58 @@ cp -R dist/Deskman.app /Applications/
 ln -s /Applications/Deskman.app/Contents/MacOS/deskman ~/.local/bin/deskman
 ```
 
-`scripts/bundle.sh` の既定はアドホック署名で、再ビルドして置き換えると許可し直しが必要になることがある。`CODESIGN_IDENTITY="証明書の名前" bash scripts/bundle.sh` のように自分の証明書で署名すれば、再ビルドしても同じアプリとして扱われる想定。
+By default `scripts/bundle.sh` signs ad hoc, so replacing the app with a new build may require granting the permission again. Signing with your own certificate, as in `CODESIGN_IDENTITY="certificate name" bash scripts/bundle.sh`, lets macOS treat rebuilds as the same app.
 
-## 使い方
+## Usage
 
 ```
-deskman                         メニューバーアプリとして起動
-deskman list [--json] [--all]   一覧（* は現在地、+ は他のディスプレイで表示中）
-deskman current [--json]        現在のデスクトップ
-deskman go [--restore-cursor] [--restore-focus] <名前|番号|UUID>
-                                移動
+deskman                         Run as a menu bar app
+deskman list [--json] [--all]   List desktops (* current, + shown on another display)
+deskman current [--json]        Show the current desktop
+deskman go [--restore-cursor] [--restore-focus] <name|number|UUID>
+                                Switch to a desktop
 deskman next [--wrap] [--cursor] [--restore-cursor] [--restore-focus]
-                                右隣へ移動
+                                Switch to the desktop on the right
 deskman prev [--wrap] [--cursor] [--restore-cursor] [--restore-focus]
-                                左隣へ移動
-deskman rename <対象> <名前>    名前を付ける（"" で解除）
-deskman rename --forget <名前>  一覧にない名前を消す
+                                Switch to the desktop on the left
+deskman rename <target> <name>  Name a desktop ("" removes the name)
+deskman rename --forget <name>  Remove a name that is not in the list
 ```
 
-`next` と `prev` は、既定ではアクティブなウィンドウのあるディスプレイで、`--cursor` を付けるとカーソルのあるディスプレイで隣へ移動する。他のディスプレイへは進まず、端では終了コード 2 で失敗する。`--wrap` を付けると反対の端へ回り込む。フルスクリーンのデスクトップも並びどおりに数える。連続で呼ぶと、呼んだ回数だけ進む。
+By default, `next` and `prev` move within the display that has the active window; with `--cursor`, within the display under the cursor. They do not continue onto other displays and fail with exit code 2 at the edge. With `--wrap`, they wrap around to the other end. Full-screen desktops count in their place in the order. Repeated calls advance once per call.
 
-`--restore-cursor` は、移動のためにカーソルを別のディスプレイへ動かした場合に、移動後に元の位置へ戻す。`--restore-focus` は、移動でキーボードのフォーカスが他のウィンドウへ移った場合に、移動前のウィンドウへ戻す。戻すのは移動前のウィンドウが画面に出ているときだけで、移動のコマンドはフォーカスを戻すのを待たずに終わる。次の移動が始まると、戻す処理は取りやめる。
+`--restore-cursor` moves the cursor back after a switch that had to move it to another display. `--restore-focus` returns keyboard focus to the previous window if the switch moved it elsewhere. Focus is returned only when the previous window is on screen, and the command finishes without waiting for it. A new switch cancels a pending focus return.
 
-番号は今の並びの順番なので、並べ替えるとずれる。ずらしたくない呼び出しでは名前か UUID を使う。
+Numbers follow the current order and change when desktops are reordered. Use a name or UUID in calls that must not shift.
 
-## 終了コード
+## Exit codes
 
-| コード | 意味 |
+| Code | Meaning |
 |---|---|
-| 0 | 成功 |
-| 1 | その他のエラー |
-| 2 | 見つからない（`next`/`prev` では端にいる） |
-| 3 | 今の一覧にない（ディスプレイが外れている、または削除された） |
-| 4 | アクセシビリティ権限がない |
-| 5 | 移動を確認できない |
-| 6 | 名前の重複 |
-| 7 | Deskman.app が起動していない |
-| 64 | 引数の誤り |
+| 0 | Success |
+| 1 | Other error |
+| 2 | Not found (for `next`/`prev`, already at the edge) |
+| 3 | Not in the current list (its display is disconnected, or it was removed) |
+| 4 | No Accessibility permission |
+| 5 | Could not confirm the switch |
+| 6 | Duplicate name |
+| 7 | Deskman.app is not running |
+| 64 | Invalid arguments |
 
-## 制限
+## Limitations
 
-- macOS の非公式 API（`CGSCopyManagedDisplaySpaces`、Dock スワイプの合成）に依存するので、macOS の更新で動かなくなることがある。macOS 27 で変わったイベントの形式にも対応したが、macOS 27 では動作を確認していない。
-- UUID が空のデスクトップには名前を付けられない。
-- スワイプはカーソルのあるディスプレイに効くので、カーソルが移動先と別のディスプレイにあるときは、既定でカーソルも移動先へ動く。`--restore-cursor` で元に戻せる。
+- Depends on private macOS APIs (`CGSCopyManagedDisplaySpaces` and synthesized Dock swipes), so a macOS update may break it. The event format that changed in macOS 27 is supported, but it has not been tested on macOS 27.
+- Desktops with an empty UUID cannot be named.
+- Swipes act on the display under the cursor, so when the cursor is on a different display from the target, the cursor moves to the target display by default. `--restore-cursor` moves it back.
 
-## データ
+## Data
 
-`~/.config/deskman/` に保存する。消すにはこのフォルダを削除する。
+Stored in `~/.config/deskman/`. Delete this folder to remove it.
 
-## 謝辞
+## Acknowledgements
 
-スワイプ合成の手法は [InstantSpaceSwitcher](https://github.com/jurplel/InstantSpaceSwitcher)（MIT）と [yabai](https://github.com/koekeishiya/yabai)（MIT）を参考にした。
+The swipe synthesis technique is based on [InstantSpaceSwitcher](https://github.com/jurplel/InstantSpaceSwitcher) (MIT) and [yabai](https://github.com/koekeishiya/yabai) (MIT).
 
-## ライセンス
+## License
 
-MIT。`LICENSE` を参照。
+MIT. See `LICENSE`.
