@@ -18,11 +18,15 @@ macOS のデスクトップに名前を付けて瞬時に移動するツール�
 
 - テスト: `swift test`
 - この Mac に入れるビルド: `CODESIGN_IDENTITY=todayporton bash scripts/bundle.sh`。指定を忘れるとアドホック署名になり、アクセシビリティ権限の入れ直しが必要になることがある。
-- `/Applications` への入れ替えはユーザーが行う。動作中のプロセスを止めてから置き換える。
+- この Mac の `/Applications/Deskman.app` は Homebrew の cask で入れたもので、ログイン時にはこちらが起動する。開発版で上書きしない。
+- 開発版はコピーせず `dist/` から起動して確認する。切り替えはユーザーが行う。どの `deskman` コマンドも、動いている方の Deskman.app にソケットで依頼する。
 
 ```
-pkill -x deskman; sleep 1; rm -rf /Applications/Deskman.app && cp -R dist/Deskman.app /Applications/ && open /Applications/Deskman.app
+pkill -x deskman; sleep 1; open dist/Deskman.app                 # 開発版で試す
+pkill -x deskman; sleep 1; open /Applications/Deskman.app        # brew 版に戻す
 ```
+
+- 開発版を起動している間は、メニューの「ログイン時に起動」を切り替えない。切り替えると、ログイン項目が `dist/` の方に登録されることがある。
 
 - 実際にデスクトップが切り替わる操作（`deskman go`、`spike/`）を、開発中にホストの Mac で自動実行しない。`macvm` スキルで VM で確認する。ホストで実行してよいのは `list` と `current` だけ。
 - VM は他のセッションと共有している。`macvm lock-status` を確認し、他のセッションがロックを持っているときは切り替えを実行せず、強制解除もしない。
