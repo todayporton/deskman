@@ -2,6 +2,7 @@ import ApplicationServices
 import ColorSync
 import CoreGraphics
 import Foundation
+import os
 
 @_silgen_name("_AXUIElementGetWindow")
 private func _AXUIElementGetWindow(_ element: AXUIElement, _ id: UnsafeMutablePointer<CGWindowID>) -> AXError
@@ -16,7 +17,11 @@ public enum SpaceSwitcher {
     private static let velocity = 2000.0
     private static let confirmTimeout: TimeInterval = 1
     /// 移動の後、macOS がフォーカスを移すのを待つ時間。移ったのを見つけたらすぐに戻す。
-    private static let focusWatch: TimeInterval = 0.15
+    /// 待ちは裏で行うので、移動の速さには影響しない。
+    private static let focusWatch: TimeInterval = 0.5
+    /// フォーカス復元の各段階を info レベルで出す。実機ではフォーカスが移るまで 150〜175ms かかった。
+    /// 確認方法: /usr/bin/log show --info --last 5m --predicate 'subsystem == "online.todayporton.deskman"'
+    private static let log = Logger(subsystem: "online.todayporton.deskman", category: "focus")
 
     private static let focusQueue = DispatchQueue(label: "deskman.focus", qos: .userInitiated)
     private static let generationLock = NSLock()
@@ -46,6 +51,13 @@ public enum SpaceSwitcher {
         }
         guard AXIsProcessTrusted() else { throw DeskmanError.notTrusted }
         let focus = restoreFocus ? Focus.current() : nil
+        if restoreFocus {
+            if let focus {
+                log.info("記録: pid=\(focus.pid, privacy: .public) window=\(focus.windowID.map(String.init) ?? "nil", privacy: .public) element=\(focus.window != nil, privacy: .public)")
+            } else {
+                log.info("記録できず: フォーカスのあるアプリを取れない")
+            }
+        }
         // スワイプはカーソルのあるディスプレイに効くので、カーソルが別のディスプレイにあれば先に移す。
         // フォーカスのあるディスプレイ内の移動でも、カーソルが他のディスプレイにあれば移す必要がある。
         let original = CGEvent(source: nil)?.location
@@ -98,28 +110,50 @@ public enum SpaceSwitcher {
     /// 戻すウィンドウが画面に出ていないときは戻さない（前に出すと macOS がデスクトップを戻してしまう）。
     /// 次の移動が始まっていたら何もしない。
     private static func restore(_ before: Focus, generation gen: Int) {
-        let deadline = Date().addingTimeInterval(focusWatch)
-        while before.isSame(Focus.current()) {
-            guard Date() < deadline, isCurrent(gen) else { return }
+        let start = Date()
+        let deadline = start.addingTimeInterval(focusWatch)
+        func ms() -> Int { Int(Date().timeIntervalSince(start) * 1000) }
+        var now = Focus.current()
+        while before.isSame(now) {
+            guard isCurrent(gen) else { return log.info("中止: 次の移動が始まった (\(ms())ms)") }
+            guard Date() < deadline else { return log.info("フォーカスは移らなかった (\(ms())ms)") }
             usleep(5000)
+            now = Focus.current()
         }
-        guard let window = before.window, let id = before.windowID else { return }
+        log.info("移った: pid=\(now?.pid ?? -1, privacy: .public) window=\(now?.windowID.map(String.init) ?? "nil", privacy: .public) (\(ms())ms)")
         // 画面に出ていないウィンドウを前に出すと、macOS がデスクトップを戻してしまう。
+        // ウィンドウ ID が取れないアプリは、そのアプリのウィンドウが画面に出ているかで判定する。
         // 移動の直後は一覧の更新が遅れることも考えて、締め切りまでは待つ
-        while !isOnScreen(id) {
-            guard Date() < deadline, isCurrent(gen) else { return }
+        while !isOnScreen(windowID: before.windowID, pid: before.pid) {
+            guard isCurrent(gen) else { return log.info("中止: 次の移動が始まった (\(ms())ms)") }
+            guard Date() < deadline else { return log.info("戻さない: 元のウィンドウが画面に出ていない (\(ms())ms)") }
             usleep(5000)
         }
-        guard isCurrent(gen) else { return }
-        AXUIElementSetAttributeValue(AXUIElementCreateApplication(before.pid),
-                                     kAXFrontmostAttribute as CFString, kCFBooleanTrue)
-        AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
-        AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        guard isCurrent(gen) else { return log.info("中止: 次の移動が始まった (\(ms())ms)") }
+        let front = AXUIElementSetAttributeValue(AXUIElementCreateApplication(before.pid),
+                                                 kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+        var main = AXError.noValue
+        var raise = AXError.noValue
+        if let window = before.window {
+            main = AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
+            raise = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        }
+        log.info("戻した: frontmost=\(front.rawValue, privacy: .public) main=\(main.rawValue, privacy: .public) raise=\(raise.rawValue, privacy: .public) (\(ms())ms)")
+        usleep(50000)
+        let after = Focus.current()
+        log.info("50ms 後: pid=\(after?.pid ?? -1, privacy: .public) window=\(after?.windowID.map(String.init) ?? "nil", privacy: .public) 戻った=\(before.isSame(after), privacy: .public)")
     }
 
-    private static func isOnScreen(_ id: CGWindowID) -> Bool {
+    private static func isOnScreen(windowID: CGWindowID?, pid: pid_t) -> Bool {
         let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
-        return list.contains { ($0[kCGWindowNumber as String] as? Int).map(CGWindowID.init) == id }
+        if let windowID {
+            return list.contains { ($0[kCGWindowNumber as String] as? Int).map(CGWindowID.init) == windowID }
+        }
+        // 通常のウィンドウ（レイヤー 0）だけを見る。メニューバーの項目などは数えない
+        return list.contains {
+            ($0[kCGWindowOwnerPID as String] as? Int).map(pid_t.init) == pid
+                && ($0[kCGWindowLayer as String] as? Int) == 0
+        }
     }
 
     private static func field(_ n: UInt32) -> CGEventField {
