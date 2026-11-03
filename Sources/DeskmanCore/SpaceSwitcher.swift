@@ -23,14 +23,17 @@ public enum SpaceSwitcher {
             return
         }
         guard AXIsProcessTrusted() else { throw DeskmanError.notTrusted }
-        // スワイプはカーソルのあるディスプレイに効くので、先にカーソルを移す
+        // スワイプはカーソルのあるディスプレイに効くので、カーソルが別のディスプレイにあれば先に移す。
+        // フォーカスのあるディスプレイ内の移動でも、カーソルが他のディスプレイにあれば移す必要がある。
         let original = CGEvent(source: nil)?.location
+        let warp = cursorDisplayID().map { $0.caseInsensitiveCompare(displayID) != .orderedSame }
+            ?? changeDisplay
         defer {
-            if restoreCursor, changeDisplay, let original {
+            if restoreCursor, warp, let original {
                 CGWarpMouseCursorPosition(original)
             }
         }
-        if changeDisplay, let point = center(ofDisplay: displayID) {
+        if warp, let point = center(ofDisplay: displayID) {
             CGWarpMouseCursorPosition(point)
         }
         postSwipes(steps)
@@ -57,6 +60,16 @@ public enum SpaceSwitcher {
                 e.post(tap: .cgSessionEventTap)
             }
         }
+    }
+
+    /// カーソルのあるディスプレイの UUID。CGSCopyManagedDisplaySpaces の Display Identifier と同じ形式。
+    public static func cursorDisplayID() -> String? {
+        guard let point = CGEvent(source: nil)?.location else { return nil }
+        var display: CGDirectDisplayID = 0
+        var count: UInt32 = 0
+        guard CGGetDisplaysWithPoint(point, 1, &display, &count) == .success, count > 0,
+              let cf = CGDisplayCreateUUIDFromDisplayID(display)?.takeRetainedValue() else { return nil }
+        return CFUUIDCreateString(nil, cf) as String
     }
 
     private static func center(ofDisplay id: String) -> CGPoint? {

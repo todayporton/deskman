@@ -154,6 +154,44 @@ final class SpaceResolverTests: XCTestCase {
     }
 }
 
+final class NeighborTests: XCTestCase {
+    private func neighbor(_ offset: Int, wrap: Bool = false, activeID: Int = 6,
+                          display: String? = nil) throws -> String {
+        try SpaceResolver.neighbor(
+            offset, wrap: wrap, spaces: SpaceParser.parse(Fixtures.connected, activeID: activeID),
+            display: display).uuid
+    }
+    func testPrevious() throws { XCTAssertEqual(try neighbor(-1), "m1") }
+    func testStopsAtEdgeOfDisplay() {
+        // m2 は MAIN の右端。EXT の e1 へは進まない
+        XCTAssertThrowsError(try neighbor(1)) {
+            XCTAssertEqual($0 as? DeskmanError, .noNeighbor(1))
+            XCTAssertEqual(($0 as? DeskmanError)?.exitCode, 2)
+        }
+    }
+    func testWrapsWithinDisplay() throws {
+        XCTAssertEqual(try neighbor(1, wrap: true), "m1")
+        XCTAssertEqual(try neighbor(-1, wrap: true, activeID: 3), "m2")
+    }
+    func testUsesDisplayWithFocus() throws {
+        XCTAssertEqual(try neighbor(1, activeID: 16), "e2")
+    }
+    func testCountsFromVisibleSpaceOfGivenDisplay() throws {
+        // フォーカスは MAIN の m2、カーソルは EXT（表示中は e1）
+        XCTAssertEqual(try neighbor(1, display: "EXT"), "e2")
+        XCTAssertEqual(try neighbor(-1, wrap: true, display: "EXT"), "e2")
+    }
+    func testUnknownDisplayFallsBackToFocus() throws {
+        // 分離されていない構成では Display Identifier が UUID と一致しないことがある
+        XCTAssertEqual(try neighbor(-1, display: "Main"), "m1")
+    }
+    func testNoActiveSpace() {
+        XCTAssertThrowsError(try neighbor(1, activeID: 999)) {
+            XCTAssertEqual($0 as? DeskmanError, .nameNotFound("current"))
+        }
+    }
+}
+
 final class SwitchPlanTests: XCTestCase {
     private let spaces = SpaceParser.parse(Fixtures.connected, activeID: 6)
 
@@ -202,6 +240,12 @@ final class GoSocketTests: XCTestCase {
             XCTAssertEqual($0 as? DeskmanError, .serverNotRunning)
             XCTAssertEqual(($0 as? DeskmanError)?.exitCode, 7)
         }
+    }
+    func testOldRequestWithoutOffsetStillDecodes() throws {
+        let r = try JSONDecoder().decode(GoRequest.self, from: Data(#"{"query":"a","restoreCursor":false}"#.utf8))
+        XCTAssertEqual(r, GoRequest(query: "a", restoreCursor: false))
+        XCTAssertNil(r.offset)
+        XCTAssertNil(r.byCursor)
     }
     func testSuccessAndRemoteFailureCarryExitCode() throws {
         let p = path()

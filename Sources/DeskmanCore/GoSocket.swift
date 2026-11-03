@@ -3,10 +3,20 @@ import Foundation
 public struct GoRequest: Codable, Equatable, Sendable {
     public let query: String
     public let restoreCursor: Bool
+    /// 指定があれば query を使わず、今のデスクトップから offset 個先へ移動する。
+    /// 処理する時点の並びで計算するので、連続で呼んでもその回数だけ進む。
+    public let offset: Int?
+    public let wrap: Bool?
+    /// offset を数えるディスプレイを、フォーカスではなくカーソルのある側にする。
+    public let byCursor: Bool?
 
-    public init(query: String, restoreCursor: Bool) {
+    public init(query: String, restoreCursor: Bool, offset: Int? = nil, wrap: Bool? = nil,
+                byCursor: Bool? = nil) {
         self.query = query
         self.restoreCursor = restoreCursor
+        self.offset = offset
+        self.wrap = wrap
+        self.byCursor = byCursor
     }
 }
 
@@ -143,9 +153,14 @@ public enum GoSocket {
     /// 常駐アプリが要求を処理する本体。
     @Sendable public static func handle(_ request: GoRequest) -> GoReply {
         do {
-            let names = try NameStore().names
-            let target = try SpaceResolver.resolve(
-                request.query, spaces: SystemSpaces.current(), names: names)
+            let spaces = SystemSpaces.current()
+            let target = if let offset = request.offset {
+                try SpaceResolver.neighbor(
+                    offset, wrap: request.wrap ?? false, spaces: spaces,
+                    display: request.byCursor == true ? SpaceSwitcher.cursorDisplayID() : nil)
+            } else {
+                try SpaceResolver.resolve(request.query, spaces: spaces, names: NameStore().names)
+            }
             try SpaceSwitcher.go(to: target, restoreCursor: request.restoreCursor)
             return GoReply(code: 0, message: "")
         } catch let error as DeskmanError {

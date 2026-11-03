@@ -26,6 +26,7 @@ public struct Space: Equatable, Sendable {
 
 public enum DeskmanError: Error, Equatable {
     case nameNotFound(String)
+    case noNeighbor(Int)
     case notInList(String)
     case notTrusted
     case switchNotConfirmed
@@ -40,7 +41,7 @@ public enum DeskmanError: Error, Equatable {
         switch self {
         case .serverNotRunning: 7
         case .remote(let code, _): code
-        case .nameNotFound: 2
+        case .nameNotFound, .noNeighbor: 2
         case .notInList: 3
         case .notTrusted: 4
         case .switchNotConfirmed: 5
@@ -54,6 +55,7 @@ public enum DeskmanError: Error, Equatable {
         case .serverNotRunning: "Deskman.app が起動していません。移動には起動が必要です: open /Applications/Deskman.app"
         case .remote(_, let message): message
         case .nameNotFound(let q): "見つかりません: \(q)"
+        case .noNeighbor(let offset): offset > 0 ? "これより右にデスクトップはありません。" : "これより左にデスクトップはありません。"
         case .notInList(let q): "\(q) は今の一覧にありません。ディスプレイが外れている可能性があります。"
         case .notTrusted: "アクセシビリティ権限が必要です。システム設定 > プライバシーとセキュリティ > アクセシビリティ で Deskman.app を許可してください。"
         case .switchNotConfirmed: "移動を確認できませんでした。"

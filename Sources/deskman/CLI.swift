@@ -54,6 +54,20 @@ func runCLI(_ arguments: [String]) throws {
             guard try queue.isLatest(ticket) else { return }
             try GoSocket.send(GoRequest(query: query, restoreCursor: restoreCursor))
         }
+    case "next", "prev":
+        let wrap = flag("--wrap")
+        let byCursor = flag("--cursor")
+        let restoreCursor = flag("--restore-cursor")
+        guard args.isEmpty else { usage() }
+        // 移動先は常駐アプリが処理する時点の並びで決める。連続で呼ばれた回数だけ進めたいので、
+        // go と違って古い要求を捨てずに順番に送る。札は取って、待っている go を取り消す。
+        let queue = GoQueue()
+        _ = try queue.takeTicket()
+        try queue.withRunLock {
+            try GoSocket.send(GoRequest(query: "", restoreCursor: restoreCursor,
+                                        offset: command == "next" ? 1 : -1, wrap: wrap,
+                                        byCursor: byCursor))
+        }
     case "rename":
         if flag("--forget") {
             guard let name = args.first else { usage() }
@@ -77,6 +91,10 @@ func usage() -> Never {
       deskman list [--json] [--all]
       deskman current [--json]
       deskman go [--restore-cursor] <名前|番号|UUID>
+      deskman next [--wrap] [--cursor] [--restore-cursor]
+                                      右隣へ。--cursor はカーソルのあるディスプレイで数える
+      deskman prev [--wrap] [--cursor] [--restore-cursor]
+                                      左隣へ
       deskman rename <対象> <名前>     "" で解除
       deskman rename --forget <名前>
 
