@@ -4,15 +4,33 @@ macOS のデスクトップ（Spaces）に名前を付けて、名前で瞬時�
 
 ## インストール
 
+Homebrew で入れる。macOS 14 以降、Apple Silicon 専用。
+
+```sh
+brew install --cask todayporton/tap/deskman
+```
+
+Deskman.app が `/Applications` に、`deskman` コマンドが Homebrew の bin に入る。
+
+Developer ID の署名と公証はしていないので、初回の起動は Gatekeeper に止められる。次の手順で開く。
+
+1. 「"Deskman"は開いていません」のダイアログで「完了」を押す。
+2. システム設定 > プライバシーとセキュリティ の下のほうにある「このまま開く」を押す。
+3. 確認のダイアログでもう一度「このまま開く」を押し、パスワードを入力する。
+
+移動には Deskman.app の常駐とアクセシビリティ権限が必要。起動したら、システム設定 > プライバシーとセキュリティ > アクセシビリティ で Deskman.app を許可する。メニューの「ログイン時に起動」で自動起動にできる。
+
+`deskman go` はローカルソケットで常駐アプリに移動を依頼する。権限は Deskman.app だけにあればよく、ターミナルや Herdr には不要。
+
+### ソースからビルドする
+
 ```sh
 bash scripts/bundle.sh
 cp -R dist/Deskman.app /Applications/
 ln -s /Applications/Deskman.app/Contents/MacOS/deskman ~/.local/bin/deskman
 ```
 
-移動には Deskman.app の常駐とアクセシビリティ権限が必要。`open /Applications/Deskman.app` で起動し、システム設定 > プライバシーとセキュリティ > アクセシビリティ で Deskman.app を許可する。メニューの「ログイン時に起動」で自動起動にできる。
-
-`deskman go` はローカルソケットで常駐アプリに移動を依頼する。権限は Deskman.app だけにあればよく、ターミナルや Herdr には不要。`scripts/bundle.sh` の既定はアドホック署名で、再ビルドして置き換えると許可し直しが必要になることがある。`CODESIGN_IDENTITY="証明書の名前" bash scripts/bundle.sh` のように自分の証明書で署名すれば、再ビルドしても同じアプリとして扱われる想定。Developer ID 署名と公証はしていないので、ビルド済みのアプリの配布には向かない。
+`scripts/bundle.sh` の既定はアドホック署名で、再ビルドして置き換えると許可し直しが必要になることがある。`CODESIGN_IDENTITY="証明書の名前" bash scripts/bundle.sh` のように自分の証明書で署名すれば、再ビルドしても同じアプリとして扱われる想定。
 
 ## 使い方
 
