@@ -11,14 +11,22 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     /// 最後にタイトルを決めたときのカーソルのディスプレイ。変わったときだけ更新する。
     private var lastCursorDisplay: CGDirectDisplayID?
     private var mouseMonitor: Any?
+    private static let missionControlKey = "showNamesInMissionControl"
+    private let missionControl = MissionControlOverlay()
 
     private var iconOnly: Bool {
         get { UserDefaults.standard.bool(forKey: Self.iconOnlyKey) }
         set { UserDefaults.standard.set(newValue, forKey: Self.iconOnlyKey) }
     }
 
+    private var namesInMissionControl: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.missionControlKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.missionControlKey) }
+    }
+
     override init() {
         super.init()
+        UserDefaults.standard.register(defaults: [Self.missionControlKey: true])
         menu.delegate = self
         item.menu = menu
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -28,6 +36,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             self, selector: #selector(refreshTitle),
             name: NSApplication.didChangeScreenParametersNotification, object: nil)
         applyDisplayMode()
+        if namesInMissionControl { missionControl.start() }
     }
 
     private func applyDisplayMode() {
@@ -123,11 +132,25 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         iconItem.target = self
         iconItem.state = iconOnly ? .on : .off
         menu.addItem(iconItem)
+        let mcItem = NSMenuItem(title: "Show Names in Mission Control",
+                                action: #selector(toggleNamesInMissionControl), keyEquivalent: "")
+        mcItem.target = self
+        mcItem.state = namesInMissionControl ? .on : .off
+        menu.addItem(mcItem)
         let login = NSMenuItem(title: "Launch at Login", action: #selector(toggleLogin), keyEquivalent: "")
         login.target = self
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(login)
         menu.addItem(NSMenuItem(title: "Quit Deskman", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+    }
+
+    @objc private func toggleNamesInMissionControl() {
+        namesInMissionControl.toggle()
+        if namesInMissionControl {
+            missionControl.start()
+        } else {
+            missionControl.stop()
+        }
     }
 
     @objc private func toggleIconOnly() {

@@ -356,3 +356,42 @@ final class MacOS27SwipeTests: XCTestCase {
         XCTAssertEqual(e.getDoubleValueField(CGEventField(rawValue: 124)!), 0.000016, accuracy: 1e-12)
     }
 }
+
+final class MissionControlLabelsTests: XCTestCase {
+    private let spaces = SpaceParser.parse(Fixtures.connected, activeID: 6)
+    private var main: [Space] { spaces.filter { $0.displayID == "MAIN" } }
+
+    func testExpandedBarPutsNameBelowThumbnail() {
+        // VM の実測: バーが開いているとき、ボタンはサムネイル（144x90）
+        let labels = MissionControlLabels.make(
+            buttons: [CGRect(x: 384, y: 28, width: 144, height: 90), CGRect(x: 560, y: 28, width: 144, height: 90)],
+            bar: CGRect(x: 0, y: 0, width: 1440, height: 146), spaces: main, names: ["m2": "資料"])
+        // m2 は MAIN で表示中
+        XCTAssertEqual(labels, [MissionControlLabel(name: "資料", frame: CGRect(x: 560, y: 120, width: 144, height: 20),
+                                                    collapsed: false, current: true)])
+    }
+    func testCollapsedBarCoversHighlight() {
+        // VM の実測: 折りたたまれているとき、ボタンの y は表示より 40pt 上（-32）。
+        // 表示中のハイライトはボタンより左右に 10pt 広い
+        let labels = MissionControlLabels.make(
+            buttons: [CGRect(x: 538, y: -32, width: 65, height: 24), CGRect(x: 635, y: -32, width: 67, height: 24)],
+            bar: CGRect(x: 0, y: 0, width: 1440, height: 40), spaces: main, names: ["m1": "仕事"])
+        XCTAssertEqual(labels, [MissionControlLabel(name: "仕事", frame: CGRect(x: 528, y: 8, width: 85, height: 24),
+                                                    collapsed: true, current: false)])
+    }
+    func testCountMismatchShowsNothing() {
+        let labels = MissionControlLabels.make(
+            buttons: [CGRect(x: 0, y: 28, width: 144, height: 90)],
+            bar: CGRect(x: 0, y: 0, width: 1440, height: 146), spaces: main, names: ["m1": "仕事"])
+        XCTAssertEqual(labels, [])
+    }
+    func testSpacesOfDisplay() {
+        XCTAssertEqual(MissionControlLabels.spaces(onDisplay: "ext", in: spaces).map(\.uuid), ["e1", "e2"])
+        // 2台あって一致しないときは、取り違えを避けて空にする
+        XCTAssertEqual(MissionControlLabels.spaces(onDisplay: "OTHER", in: spaces), [])
+        // ディスプレイごとに分けない設定（Display Identifier が Main）なら全部
+        let single = SpaceParser.parse([Fixtures.display("Main", current: 3, [Fixtures.space(3, "m1")])], activeID: 3)
+        XCTAssertEqual(MissionControlLabels.spaces(onDisplay: "UUID-X", in: single).map(\.uuid), ["m1"])
+        XCTAssertEqual(MissionControlLabels.spaces(onDisplay: nil, in: single).map(\.uuid), ["m1"])
+    }
+}

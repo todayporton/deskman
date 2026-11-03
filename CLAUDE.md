@@ -7,7 +7,7 @@ macOS のデスクトップに名前を付けて瞬時に移動するツール�
 - 1つのバイナリが、引数なしならメニューバー常駐、引数ありなら CLI として動く。
 - `deskman go` はソケット（`~/.config/deskman/deskman.sock`）で Deskman.app に移動を依頼する。アクセシビリティ権限は Deskman.app だけに持たせる。Herdr のターミナルは `herdr-core` の配下で動くので、CLI から直接スワイプを送る構成には戻さない。
 - 名前は UUID に紐づけて `~/.config/deskman/names.json` に保存する。番号と数値 ID は変わるので保存しない。
-- 非公式 API は `SystemSpaces.swift` と `SpaceSwitcher.swift` に閉じ込める。
+- 非公式 API は `SystemSpaces.swift` と `SpaceSwitcher.swift` に閉じ込める。Mission Control の Dock の要素の構造（公開された仕様ではない）を読むのは `MissionControlOverlay.swift` だけにする。
 
 ## 要件
 
@@ -34,4 +34,4 @@ pkill -x deskman; sleep 1; open /Applications/Deskman.app        # brew 版に�
 
 ## 未確認
 
-自動起動、この Mac での並べ替えと増減、外部ディスプレイを抜いている間の移動、再起動後の UUID。macOS 27 の形式は Raycast の実装を読んで組み込んだが、実機では未確認（設計資料の「Raycast の実装」を参照）。
+自動起動、この Mac での並べ替えと増減、Mission Control の名前表示のディスプレイ2台とフルスクリーンのデスクトップ、外部ディスプレイを抜いている間の移動、再起動後の UUID。macOS 27 の形式は Raycast の実装を読んで組み込んだが、実機では未確認（設計資料の「Raycast の実装」を参照）。

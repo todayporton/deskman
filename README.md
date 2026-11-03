@@ -26,6 +26,8 @@ Switching needs Deskman.app running and granted Accessibility access. After laun
 
 The menu bar shows the name of the desktop on the display under the cursor, and changes as soon as the cursor moves to another display. Choose "Show Icon Only" in the menu to show an icon instead of the name.
 
+Mission Control shows your names in place of "Desktop N" for named desktops. Deskman reads the label positions from the Dock and draws the names on top, checking whether Mission Control is open every 0.1 seconds. Turn this off with "Show Names in Mission Control" in the menu.
+
 `deskman go` asks the running app to switch over a local socket. Only Deskman.app needs the permission; your terminal or Herdr does not.
 
 ### Building from source
