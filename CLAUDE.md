@@ -17,7 +17,7 @@ macOS のデスクトップに名前を付けて瞬時に移動するツール�
 ## ビルドと確認
 
 - テスト: `swift test`
-- この Mac に入れるビルド: `CODESIGN_IDENTITY=todayporton bash scripts/bundle.sh`。指定を忘れるとアドホック署名になり、アクセシビリティ権限の入れ直しが必要になることがある。
+- この Mac に入れるビルド: `CODESIGN_IDENTITY=todayporton bash scripts/bundle.sh`。指定を忘れるとアドホック署名になり、アクセシビリティ権限の入れ直しが必要になることがある。`todayporton` で署名したビルドなら、入れ替えても権限は保たれる（2026-11-03、Homebrew で 0.1.0 から 0.2.0 に更新して確認）。
 - この Mac の `/Applications/Deskman.app` は Homebrew の cask で入れたもので、ログイン時にはこちらが起動する。開発版で上書きしない。
 - 開発版はコピーせず `dist/` から起動して確認する。切り替えはユーザーが行う。どの `deskman` コマンドも、動いている方の Deskman.app にソケットで依頼する。
 
@@ -34,4 +34,4 @@ pkill -x deskman; sleep 1; open /Applications/Deskman.app        # brew 版に�
 
 ## 未確認
 
-再ビルド後に権限が保たれるか、自動起動、この Mac での並べ替えと増減、外部ディスプレイを抜いている間の移動、再起動後の UUID。macOS 27 の形式は Raycast の実装を読んで組み込んだが、実機では未確認（設計資料の「Raycast の実装」を参照）。
+自動起動、この Mac での並べ替えと増減、外部ディスプレイを抜いている間の移動、再起動後の UUID。macOS 27 の形式は Raycast の実装を読んで組み込んだが、実機では未確認（設計資料の「Raycast の実装」を参照）。
