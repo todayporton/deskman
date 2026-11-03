@@ -24,7 +24,7 @@ The app is not signed with a Developer ID or notarized, so Gatekeeper blocks the
 
 Switching needs Deskman.app running and granted Accessibility access. After launching it, allow Deskman.app in System Settings > Privacy & Security > Accessibility. Choose "Launch at Login" in its menu to start it automatically.
 
-The menu bar shows the name of the desktop on the display under the cursor, and changes as soon as the cursor moves to another display. Choose "Show Icon Only" in the menu to show an icon instead of the name.
+The menu bar shows the desktop on the display under the cursor, and changes as soon as the cursor moves to another display. Choose what it shows from "Menu Bar Shows" in the menu: the name, the number (counted across all displays, as in Mission Control, with a fixed width that fits two digits), or only an icon.
 
 Mission Control shows your names in place of "Desktop N" for named desktops. Deskman reads the label positions from the Dock and draws the names on top, checking whether Mission Control is open every 0.1 seconds. Turn this off with "Show Names in Mission Control" in the menu.
 

@@ -3,10 +3,25 @@ import ApplicationServices
 import DeskmanCore
 import ServiceManagement
 
+/// メニューバーに出すもの。値は UserDefaults に保存する。
+enum MenuBarStyle: String, CaseIterable {
+    case name, number, icon
+
+    var title: String {
+        switch self {
+        case .name: "Name"
+        case .number: "Number"
+        case .icon: "Icon"
+        }
+    }
+}
+
 @MainActor
 final class MenuBarController: NSObject, NSMenuDelegate {
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let menu = NSMenu()
+    private static let styleKey = "menuBarStyle"
+    /// 0.3.0 以前の「Show Icon Only」。style が未設定のときだけ読む
     private static let iconOnlyKey = "showIconOnly"
     /// 最後にタイトルを決めたときのカーソルのディスプレイ。変わったときだけ更新する。
     private var lastCursorDisplay: CGDirectDisplayID?
@@ -14,9 +29,18 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private static let missionControlKey = "showNamesInMissionControl"
     private let missionControl = MissionControlOverlay()
 
-    private var iconOnly: Bool {
-        get { UserDefaults.standard.bool(forKey: Self.iconOnlyKey) }
-        set { UserDefaults.standard.set(newValue, forKey: Self.iconOnlyKey) }
+    private var style: MenuBarStyle {
+        get {
+            let defaults = UserDefaults.standard
+            if let raw = defaults.string(forKey: Self.styleKey), let style = MenuBarStyle(rawValue: raw) {
+                return style
+            }
+            return defaults.bool(forKey: Self.iconOnlyKey) ? .icon : .name
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: Self.styleKey)
+            UserDefaults.standard.removeObject(forKey: Self.iconOnlyKey)
+        }
     }
 
     private var namesInMissionControl: Bool {
@@ -40,18 +64,33 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     private func applyDisplayMode() {
-        if iconOnly {
+        if style == .icon {
             stopWatchingCursor()
+            item.length = NSStatusItem.variableLength
             item.button?.image = MenuBarIcon.make()
             item.button?.title = ""
             return
         }
         item.button?.image = nil
+        // 番号は桁数で幅が変わらないよう、2桁分の幅に固定する。名前は長さに合わせる
+        item.length = style == .number ? Self.numberWidth() : NSStatusItem.variableLength
         startWatchingCursor()
         refreshTitle()
     }
 
-    /// 名前を出すときだけ、カーソルがディスプレイをまたいだのを見張る。
+    /// 番号に使う等幅数字のフォント
+    private static func numberFont() -> NSFont {
+        NSFont.monospacedDigitSystemFont(ofSize: NSFont.menuBarFont(ofSize: 0).pointSize, weight: .regular)
+    }
+
+    /// 「00」が収まる長さ。macOS はこの長さの外にも余白を足す（VM の macOS 26 で約 18pt）ので、
+    /// 名前のとき（文字幅 + 約 24pt）と見た目の余白がそろうよう、足す分は小さくする
+    private static func numberWidth() -> CGFloat {
+        let text = ("00" as NSString).size(withAttributes: [.font: numberFont()]).width
+        return ceil(text) + 6
+    }
+
+    /// 名前か番号を出すときだけ、カーソルがディスプレイをまたいだのを見張る。
     /// 他のアプリに届くマウスの移動だけを受ける。自分のメニューを開いている間は見張らない
     /// （メニューの中の移動まで処理すると、項目のハイライトが遅れる）。
     private func startWatchingCursor() {
@@ -73,7 +112,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     func menuDidClose(_ menu: NSMenu) {
-        guard !iconOnly else { return }
+        guard style != .icon else { return }
         startWatchingCursor()
         refreshTitle()
     }
@@ -91,15 +130,22 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         names[space.uuid] ?? (space.isFullscreen ? "Full Screen" : "Desktop \(space.index)")
     }
 
-    /// カーソルのあるディスプレイで表示中のデスクトップの名前を出す。
+    /// カーソルのあるディスプレイで表示中のデスクトップの名前か番号を出す。
     @objc private func refreshTitle() {
-        guard !iconOnly else { return }
+        let style = self.style
+        guard style != .icon else { return }
         let display = SpaceSwitcher.cursorDisplay()
         lastCursorDisplay = display
         let spaces = SystemSpaces.current()
         guard let s = SpaceResolver.visible(onDisplay: display.flatMap(SpaceSwitcher.displayUUID),
                                             spaces: spaces) else { return }
-        item.button?.title = title(for: s, names: names())
+        if style == .number {
+            // 番号は Mission Control の「デスクトップN」と同じ、全ディスプレイを通した番号
+            item.button?.attributedTitle = NSAttributedString(
+                string: String(s.index), attributes: [.font: Self.numberFont()])
+        } else {
+            item.button?.title = title(for: s, names: names())
+        }
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -128,10 +174,18 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                                 action: #selector(renameCurrent), keyEquivalent: "")
         rename.target = self
         menu.addItem(rename)
-        let iconItem = NSMenuItem(title: "Show Icon Only", action: #selector(toggleIconOnly), keyEquivalent: "")
-        iconItem.target = self
-        iconItem.state = iconOnly ? .on : .off
-        menu.addItem(iconItem)
+        let styleMenu = NSMenu()
+        let current = style
+        for option in MenuBarStyle.allCases {
+            let row = NSMenuItem(title: option.title, action: #selector(chooseStyle(_:)), keyEquivalent: "")
+            row.target = self
+            row.representedObject = option.rawValue
+            row.state = option == current ? .on : .off
+            styleMenu.addItem(row)
+        }
+        let styleItem = NSMenuItem(title: "Menu Bar Shows", action: nil, keyEquivalent: "")
+        styleItem.submenu = styleMenu
+        menu.addItem(styleItem)
         let mcItem = NSMenuItem(title: "Show Names in Mission Control",
                                 action: #selector(toggleNamesInMissionControl), keyEquivalent: "")
         mcItem.target = self
@@ -153,8 +207,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
     }
 
-    @objc private func toggleIconOnly() {
-        iconOnly.toggle()
+    @objc private func chooseStyle(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let style = MenuBarStyle(rawValue: raw) else { return }
+        self.style = style
         applyDisplayMode()
     }
 
