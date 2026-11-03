@@ -155,6 +155,12 @@ public enum GoSocket {
 
     /// 常駐アプリが要求を処理する本体。
     @Sendable public static func handle(_ request: GoRequest) -> GoReply {
+        handle(request, onError: { _ in })
+    }
+
+    /// onError には、移動できなかったときの DeskmanError が渡される。返す内容は変わらない。
+    public static func handle(_ request: GoRequest,
+                              onError: (DeskmanError) -> Void) -> GoReply {
         do {
             let spaces = SystemSpaces.current()
             let target = if let offset = request.offset {
@@ -168,6 +174,7 @@ public enum GoSocket {
                                  restoreFocus: request.restoreFocus ?? false)
             return GoReply(code: 0, message: "")
         } catch let error as DeskmanError {
+            onError(error)
             return GoReply(code: error.exitCode, message: error.message)
         } catch {
             return GoReply(code: 1, message: "\(error)")

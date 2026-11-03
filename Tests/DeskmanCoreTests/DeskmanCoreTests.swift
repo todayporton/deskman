@@ -169,6 +169,13 @@ final class NeighborTests: XCTestCase {
             XCTAssertEqual(($0 as? DeskmanError)?.exitCode, 2)
         }
     }
+    func testAlertSoundOnlyWhenTargetIsUnreachable() {
+        XCTAssertTrue(DeskmanError.noNeighbor(1).playsAlertSound)
+        XCTAssertTrue(DeskmanError.notInList("資料").playsAlertSound)
+        XCTAssertFalse(DeskmanError.nameNotFound("typo").playsAlertSound)
+        XCTAssertFalse(DeskmanError.notTrusted.playsAlertSound)
+        XCTAssertFalse(DeskmanError.switchNotConfirmed.playsAlertSound)
+    }
     func testWrapsWithinDisplay() throws {
         XCTAssertEqual(try neighbor(1, wrap: true), "m1")
         XCTAssertEqual(try neighbor(-1, wrap: true, activeID: 3), "m2")

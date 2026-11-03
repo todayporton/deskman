@@ -127,7 +127,12 @@ func runMenuBar() -> Never {
     // すでに常駐しているなら、ソケットを奪わずに終了する
     if GoSocket.isServerRunning() { exit(0) }
     do {
-        try GoSocket.serve(handler: GoSocket.handle)
+        try GoSocket.serve { request in
+            GoSocket.handle(request) { error in
+                // システム設定 > サウンド で選ばれている通知音を鳴らす
+                if error.playsAlertSound { DispatchQueue.main.async { NSSound.beep() } }
+            }
+        }
     } catch {
         FileHandle.standardError.write(Data("ソケットを開けませんでした: \(error)\n".utf8))
         exit(1)

@@ -65,4 +65,13 @@ public enum DeskmanError: Error, Equatable {
         case .hasLiveSpace(let n): "\(n) は今の一覧にあるので消せません。解除するには rename <対象> \"\" を使ってください。"
         }
     }
+
+    /// 指定は正しいが行き先がなくて移動できなかったとき。常駐アプリが通知音を鳴らす。
+    /// 打ち間違いや権限の問題は、音ではなくメッセージで知らせる。
+    public var playsAlertSound: Bool {
+        switch self {
+        case .noNeighbor, .notInList: true
+        default: false
+        }
+    }
 }
