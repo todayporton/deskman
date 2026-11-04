@@ -181,6 +181,12 @@ public enum SpaceSwitcher {
         }
     }
 
+    /// アクセシビリティのウィンドウ要素のウィンドウ番号。
+    public static func windowID(of window: AXUIElement) -> CGWindowID? {
+        var id: CGWindowID = 0
+        return _AXUIElementGetWindow(window, &id) == .success ? id : nil
+    }
+
     /// カーソルのあるディスプレイの UUID。CGSCopyManagedDisplaySpaces の Display Identifier と同じ形式。
     public static func cursorDisplayID() -> String? {
         cursorDisplay().flatMap(displayUUID)

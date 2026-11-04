@@ -26,7 +26,7 @@ Switching needs Deskman.app running and granted Accessibility access. After laun
 
 The menu bar shows the desktop on the display under the cursor, and changes as soon as the cursor moves to another display. Choose what it shows from "Menu Bar Shows" in the menu: the name, the number (counted across all displays, as in Mission Control, with a fixed width that fits two digits), or only an icon.
 
-Mission Control shows your names in place of "Desktop N" for named desktops. Deskman reads the label positions from the Dock and draws the names on top, checking whether Mission Control is open every 0.1 seconds. Turn this off with "Show Names in Mission Control" in the menu.
+In Mission Control, Deskman shows each desktop's name at the top edge of the screen, above the desktop, in a notch-shaped tab that slides down (unnamed desktops show "Desktop N"; full-screen ones are left as they are). Deskman reads the desktop positions from the Dock, checking whether Mission Control is open every 0.1 seconds. Turn this off with "Show Names in Mission Control" in the menu.
 
 `deskman go` asks the running app to switch over a local socket. Only Deskman.app needs the permission; your terminal or Herdr does not.
 
@@ -52,6 +52,8 @@ deskman next [--wrap] [--cursor] [--restore-cursor] [--restore-focus]
                                 Switch to the desktop on the right
 deskman prev [--wrap] [--cursor] [--restore-cursor] [--restore-focus]
                                 Switch to the desktop on the left
+deskman move [--stay] [--wrap] <name|number|UUID|next|prev>
+                                Move the focused window to another desktop
 deskman rename <target> <name>  Name a desktop ("" removes the name)
 deskman rename --forget <name>  Remove a name that is not in the list
 ```
@@ -59,6 +61,8 @@ deskman rename --forget <name>  Remove a name that is not in the list
 By default, `next` and `prev` move within the display that has the active window; with `--cursor`, within the display under the cursor. They do not continue onto other displays and fail with exit code 2 at the edge. With `--wrap`, they wrap around to the other end. Full-screen desktops count in their place in the order. Repeated calls advance once per call.
 
 `--restore-cursor` moves the cursor back after a switch that had to move it to another display. `--restore-focus` returns keyboard focus to the previous window if the switch moved it elsewhere. Focus is returned only when the previous window is on screen, and the command finishes without waiting for it. A new switch cancels a pending focus return.
+
+`move` carries the focused window to a desktop on the same display, and you go with it. With `--stay`, the window goes and you come back. `next` and `prev` mean the neighbouring desktop (they take precedence over desktops named "next" or "prev"; use the UUID for those), and `--wrap` wraps around at the edge. It holds the window by its title bar and switches with the "Move left a space" and "Move right a space" shortcuts (System Settings > Keyboard > Keyboard Shortcuts > Mission Control), Control+Arrow by default. Deskman reads the keys you assigned, and if the shortcuts are off it turns them on only while the window is carried, so they can stay off. Switching desktops with `move` is not instant, unlike `go`: synthetic swipes do not work while a window is held, so the switch animates and takes about 0.35 seconds per desktop passed (with `--stay`, the return trip is instant). Windows without a title bar, full-screen windows, full-screen destinations, other displays and shortcuts with no key assigned are refused with exit code 8. If the move fails partway, Deskman switches back to where it started.
 
 Numbers follow the current order and change when desktops are reordered. Use a name or UUID in calls that must not shift.
 
@@ -71,9 +75,10 @@ Numbers follow the current order and change when desktops are reordered. Use a n
 | 2 | Not found (for `next`/`prev`, already at the edge) |
 | 3 | Not in the current list (its display is disconnected, or it was removed) |
 | 4 | No Accessibility permission |
-| 5 | Could not confirm the switch |
+| 5 | Could not confirm the switch (for `move`, that the window moved) |
 | 6 | Duplicate name |
-| 7 | Deskman.app is not running |
+| 7 | Deskman.app is not running (for `move`, also when the running one is too old to move windows) |
+| 8 | The window cannot be moved (no focused window or title bar, full screen, another display, or no key for the shortcuts) |
 | 64 | Invalid arguments |
 
 ## Limitations

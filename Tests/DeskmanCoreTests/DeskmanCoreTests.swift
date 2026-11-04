@@ -285,6 +285,27 @@ final class GoSocketTests: XCTestCase {
             XCTAssertEqual(($0 as? DeskmanError)?.message, "一覧にありません")
         }
     }
+    func testNewServerAnswersPingWithoutMoving() throws {
+        let p = path()
+        defer { unlink(p) }
+        // 本物の handle を使う。ping は一覧も名前も読まずに成功を返す
+        try GoSocket.serve(path: p, handler: GoSocket.handle)
+        XCTAssertNoThrow(try GoSocket.requireMoveSupport(path: p))
+    }
+    func testOldServerIsRefusedBeforeMoving() throws {
+        let p = path()
+        defer { unlink(p) }
+        // 0.3.0 の常駐アプリは ping を知らず、空の名前の移動として「見つからない」を返す
+        try GoSocket.serve(path: p) { request in
+            request.query.isEmpty && request.offset == nil
+                ? GoReply(code: 2, message: "Not found: ")
+                : GoReply(code: 0, message: "")
+        }
+        XCTAssertThrowsError(try GoSocket.requireMoveSupport(path: p)) {
+            XCTAssertEqual($0 as? DeskmanError, .serverTooOld)
+            XCTAssertEqual(($0 as? DeskmanError)?.exitCode, 7)
+        }
+    }
 }
 
 final class SpaceRowTests: XCTestCase {
@@ -361,28 +382,44 @@ final class MissionControlLabelsTests: XCTestCase {
     private let spaces = SpaceParser.parse(Fixtures.connected, activeID: 6)
     private var main: [Space] { spaces.filter { $0.displayID == "MAIN" } }
 
-    func testExpandedBarPutsNameBelowThumbnail() {
-        // VM の実測: バーが開いているとき、ボタンはサムネイル（144x90）
-        let labels = MissionControlLabels.make(
-            buttons: [CGRect(x: 384, y: 28, width: 144, height: 90), CGRect(x: 560, y: 28, width: 144, height: 90)],
-            bar: CGRect(x: 0, y: 0, width: 1440, height: 146), spaces: main, names: ["m2": "資料"])
-        // m2 は MAIN で表示中
-        XCTAssertEqual(labels, [MissionControlLabel(name: "資料", frame: CGRect(x: 560, y: 120, width: 144, height: 20),
-                                                    collapsed: false, current: true)])
+    // VM の実測: 折りたたまれているとき、ボタンは名前そのもの（65x24 前後、y は表示より 40pt 上）
+    private let collapsed = [CGRect(x: 441, y: -32, width: 65, height: 24), CGRect(x: 538, y: -32, width: 65, height: 24),
+                             CGRect(x: 635, y: -32, width: 67, height: 24)]
+    // バーが開いているとき、ボタンはサムネイル（144x90）で、上端から 28pt 下
+    private let expanded = [CGRect(x: 384, y: 28, width: 144, height: 90), CGRect(x: 560, y: 28, width: 144, height: 90),
+                            CGRect(x: 736, y: 28, width: 144, height: 90)]
+
+    func testWidthIsTheLargestThatDoesNotOverlapWhenCollapsed() {
+        // 中心の間隔は 97 と 98。小さい方から隙間 4 を引く
+        XCTAssertEqual(MissionControlLabels.width(buttons: collapsed), 93)
+        XCTAssertNil(MissionControlLabels.width(buttons: expanded))
+        XCTAssertEqual(MissionControlLabels.width(buttons: [collapsed[0]]), 85)
     }
-    func testCollapsedBarCoversHighlight() {
-        // VM の実測: 折りたたまれているとき、ボタンの y は表示より 40pt 上（-32）。
-        // 表示中のハイライトはボタンより左右に 10pt 広い
-        let labels = MissionControlLabels.make(
-            buttons: [CGRect(x: 538, y: -32, width: 65, height: 24), CGRect(x: 635, y: -32, width: 67, height: 24)],
-            bar: CGRect(x: 0, y: 0, width: 1440, height: 40), spaces: main, names: ["m1": "仕事"])
-        XCTAssertEqual(labels, [MissionControlLabel(name: "仕事", frame: CGRect(x: 528, y: 8, width: 85, height: 24),
-                                                    collapsed: true, current: false)])
+    func testSameSizeAtTopInBothStates() {
+        // MAIN: m1, m2（表示中）。名前は m2 だけ
+        let a = MissionControlLabels.make(buttons: Array(collapsed.prefix(2)), top: 0, width: 93, spaces: main,
+                                          names: ["m2": "資料"])
+        let b = MissionControlLabels.make(buttons: Array(expanded.prefix(2)), top: 0, width: 93, spaces: main,
+                                          names: ["m2": "資料"])
+        XCTAssertEqual(a.map(\.name), ["Desktop 1", "資料"])
+        XCTAssertEqual(a.map(\.current), [false, true])
+        XCTAssertEqual(a[1].frame, CGRect(x: 570.5 - 46.5, y: 0, width: 93, height: 34))
+        // 開いても大きさは同じで、サムネイルの中心の真上へ動く
+        XCTAssertEqual(b[1].frame, CGRect(x: 632 - 46.5, y: 0, width: 93, height: 34))
+    }
+    func testSecondDisplayUsesItsOwnTop() {
+        let labels = MissionControlLabels.make(buttons: Array(expanded.prefix(2)), top: -200, width: 93,
+                                               spaces: main, names: [:])
+        XCTAssertEqual(labels.first?.frame.minY, -200)
+    }
+    func testFullscreenIsLeftAlone() {
+        let s = SpaceParser.parse([Fixtures.display("MAIN", current: 1, [
+            Fixtures.space(1, "m1"), Fixtures.space(2, "f", type: 4)])], activeID: 1)
+        let labels = MissionControlLabels.make(buttons: Array(expanded.prefix(2)), top: 0, width: 93, spaces: s, names: [:])
+        XCTAssertEqual(labels.map(\.name), ["Desktop 1"])
     }
     func testCountMismatchShowsNothing() {
-        let labels = MissionControlLabels.make(
-            buttons: [CGRect(x: 0, y: 28, width: 144, height: 90)],
-            bar: CGRect(x: 0, y: 0, width: 1440, height: 146), spaces: main, names: ["m1": "仕事"])
+        let labels = MissionControlLabels.make(buttons: [expanded[0]], top: 0, width: 93, spaces: main, names: [:])
         XCTAssertEqual(labels, [])
     }
     func testSpacesOfDisplay() {
@@ -393,5 +430,77 @@ final class MissionControlLabelsTests: XCTestCase {
         let single = SpaceParser.parse([Fixtures.display("Main", current: 3, [Fixtures.space(3, "m1")])], activeID: 3)
         XCTAssertEqual(MissionControlLabels.spaces(onDisplay: "UUID-X", in: single).map(\.uuid), ["m1"])
         XCTAssertEqual(MissionControlLabels.spaces(onDisplay: nil, in: single).map(\.uuid), ["m1"])
+    }
+}
+
+final class MovePlanTests: XCTestCase {
+    /// MAIN: m1, m2, f(フルスクリーン), m3。EXT: e1。フォーカスは m1
+    private func spaces(activeID: Int = 1) -> [Space] {
+        SpaceParser.parse([
+            Fixtures.display("MAIN", current: activeID == 21 ? 1 : activeID, [
+                Fixtures.space(1, "m1"), Fixtures.space(2, "m2"), Fixtures.space(3, "f", type: 4),
+                Fixtures.space(4, "m3"),
+            ]),
+            Fixtures.display("EXT", current: 21, [Fixtures.space(21, "e1")]),
+        ], activeID: activeID)
+    }
+    private func target(_ uuid: String, _ s: [Space]) -> Space { s.first { $0.uuid == uuid }! }
+
+    func testPathGoesThroughEachStep() throws {
+        let s = spaces()
+        let plan = try MovePlan.make(to: target("m3", s), spaces: s)
+        XCTAssertEqual(plan.origin.uuid, "m1")
+        // フルスクリーンも 1 ステップとして通る
+        XCTAssertEqual(plan.path.map(\.uuid), ["m2", "f", "m3"])
+    }
+    func testPathToTheLeft() throws {
+        let s = spaces(activeID: 4)
+        XCTAssertEqual(try MovePlan.make(to: target("m1", s), spaces: s).path.map(\.uuid), ["f", "m2", "m1"])
+    }
+    func testAlreadyThere() throws {
+        let s = spaces()
+        XCTAssertEqual(try MovePlan.make(to: target("m1", s), spaces: s).path, [])
+    }
+    func testRefusesOtherDisplay() {
+        let s = spaces()
+        XCTAssertThrowsError(try MovePlan.make(to: target("e1", s), spaces: s)) {
+            XCTAssertEqual($0 as? DeskmanError, .cannotMoveWindow(.otherDisplay))
+            XCTAssertEqual(($0 as? DeskmanError)?.exitCode, 8)
+        }
+    }
+    func testRefusesFullscreenTarget() {
+        let s = spaces()
+        XCTAssertThrowsError(try MovePlan.make(to: target("f", s), spaces: s)) {
+            XCTAssertEqual($0 as? DeskmanError, .cannotMoveWindow(.toFullscreen))
+        }
+    }
+    func testRefusesFromFullscreen() {
+        let s = spaces(activeID: 3)
+        XCTAssertThrowsError(try MovePlan.make(to: target("m1", s), spaces: s)) {
+            XCTAssertEqual($0 as? DeskmanError, .cannotMoveWindow(.fullscreen))
+        }
+    }
+    func testMoveRequestDecodesWithoutNewFields() throws {
+        // 古い CLI の要求（moveWindow なし）も読める
+        let old = #"{"query":"資料","restoreCursor":false}"#
+        let request = try JSONDecoder().decode(GoRequest.self, from: Data(old.utf8))
+        XCTAssertNil(request.moveWindow)
+        XCTAssertNil(request.stay)
+    }
+}
+
+final class SpaceShortcutsTests: XCTestCase {
+    func testNoKeyAssigned() {
+        XCTAssertNil(SpaceShortcut(keyCode: UInt16(0xFFFF), modifiers: UInt32(0x840000)))
+    }
+    func testArrowKeysGetTheNumericPadFlag() {
+        // 実機の設定: Control+Option+→（WindowServer から読んだ値）
+        let s = SpaceShortcut(keyCode: UInt16(124), modifiers: UInt32(0x8C0000))
+        XCTAssertEqual(s?.keyCode, 124)
+        XCTAssertEqual(s?.flags, [.maskSecondaryFn, .maskControl, .maskAlternate, .maskNumericPad])
+    }
+    func testOtherKeysAreSentAsIs() {
+        let s = SpaceShortcut(keyCode: UInt16(0), modifiers: UInt32(0x40000))
+        XCTAssertEqual(s?.flags, [.maskControl])
     }
 }

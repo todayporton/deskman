@@ -34,4 +34,4 @@ pkill -x deskman; sleep 1; open /Applications/Deskman.app        # brew 版に�
 
 ## 未確認
 
-自動起動、この Mac での並べ替えと増減、Mission Control の名前表示のディスプレイ2台とフルスクリーンのデスクトップ、外部ディスプレイを抜いている間の移動、再起動後の UUID。macOS 27 の形式は Raycast の実装を読んで組み込んだが、実機では未確認（設計資料の「Raycast の実装」を参照）。
+自動起動、この Mac での並べ替えと増減、Mission Control の名前表示のフルスクリーンのデスクトップ、`move` のディスプレイ2台の1台目・タイトルバーのないウィンドウ、外部ディスプレイを抜いている間の移動、再起動後の UUID。macOS 27 の形式は Raycast の実装を読んで組み込んだが、実機では未確認（設計資料の「Raycast の実装」を参照）。

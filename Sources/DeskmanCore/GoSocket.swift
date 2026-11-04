@@ -11,16 +11,29 @@ public struct GoRequest: Codable, Equatable, Sendable {
     public let byCursor: Bool?
     /// 移動でキーボードのフォーカスが他のアプリへ移ったら、移動前のウィンドウへ戻す。
     public let restoreFocus: Bool?
+    /// 自分ではなく、フォーカスのあるウィンドウを行き先へ運ぶ。
+    public let moveWindow: Bool?
+    /// moveWindow のとき、運んだ後に元のデスクトップへ戻る。
+    public let stay: Bool?
+    /// 何もせずに成功を返す。常駐アプリが moveWindow に対応しているかを確かめる。
+    /// 古い常駐アプリは空の名前の移動として扱い、「見つからない」を返すだけで何も動かさない。
+    public let ping: Bool?
 
     public init(query: String, restoreCursor: Bool, offset: Int? = nil, wrap: Bool? = nil,
-                byCursor: Bool? = nil, restoreFocus: Bool? = nil) {
+                byCursor: Bool? = nil, restoreFocus: Bool? = nil, moveWindow: Bool? = nil, stay: Bool? = nil,
+                ping: Bool? = nil) {
         self.query = query
         self.restoreCursor = restoreCursor
         self.offset = offset
         self.wrap = wrap
         self.byCursor = byCursor
         self.restoreFocus = restoreFocus
+        self.moveWindow = moveWindow
+        self.stay = stay
+        self.ping = ping
     }
+
+    public static let ping = GoRequest(query: "", restoreCursor: false, ping: true)
 }
 
 public struct GoReply: Codable, Equatable, Sendable {
@@ -100,10 +113,11 @@ public enum GoSocket {
     }
 
     /// 移動の結果を受け取るまで待つ。失敗はそのまま DeskmanError として投げる。
+    /// ウィンドウを運ぶときは 1 ステップ約 0.4 秒かかるので、待つ時間を延ばす。
     public static func send(_ request: GoRequest, path: String = defaultPath) throws {
         guard let fd = connectFD(path) else { throw DeskmanError.serverNotRunning }
         defer { close(fd) }
-        var timeout = timeval(tv_sec: 3, tv_usec: 0)
+        var timeout = timeval(tv_sec: request.moveWindow == true ? 30 : 3, tv_usec: 0)
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
         writeAll(fd, try JSONEncoder().encode(request))
         shutdown(fd, SHUT_WR)
@@ -112,6 +126,16 @@ public enum GoSocket {
         }
         if reply.code != 0 {
             throw DeskmanError.remote(code: reply.code, message: reply.message)
+        }
+    }
+
+    /// 常駐アプリが moveWindow に対応しているかを確かめる。古い常駐アプリは moveWindow を読み飛ばし、
+    /// ただの移動として実行してしまうので、ウィンドウを運ぶ前に必ず確かめる。
+    public static func requireMoveSupport(path: String = defaultPath) throws {
+        do {
+            try send(.ping, path: path)
+        } catch DeskmanError.remote {
+            throw DeskmanError.serverTooOld
         }
     }
 
@@ -161,6 +185,7 @@ public enum GoSocket {
     /// onError には、移動できなかったときの DeskmanError が渡される。返す内容は変わらない。
     public static func handle(_ request: GoRequest,
                               onError: (DeskmanError) -> Void) -> GoReply {
+        if request.ping == true { return GoReply(code: 0, message: "") }
         do {
             let spaces = SystemSpaces.current()
             let target = if let offset = request.offset {
@@ -170,8 +195,12 @@ public enum GoSocket {
             } else {
                 try SpaceResolver.resolve(request.query, spaces: spaces, names: NameStore().names)
             }
-            try SpaceSwitcher.go(to: target, restoreCursor: request.restoreCursor,
-                                 restoreFocus: request.restoreFocus ?? false)
+            if request.moveWindow == true {
+                try WindowMover.move(to: target, stay: request.stay ?? false)
+            } else {
+                try SpaceSwitcher.go(to: target, restoreCursor: request.restoreCursor,
+                                     restoreFocus: request.restoreFocus ?? false)
+            }
             return GoReply(code: 0, message: "")
         } catch let error as DeskmanError {
             onError(error)

@@ -71,6 +71,30 @@ func runCLI(_ arguments: [String]) throws {
                                         offset: command == "next" ? 1 : -1, wrap: wrap,
                                         byCursor: byCursor, restoreFocus: restoreFocus))
         }
+    case "move":
+        let stay = flag("--stay")
+        let wrap = flag("--wrap")
+        guard args.count == 1 else { usage() }
+        let query = args[0]
+        // next と prev は、その名前のデスクトップより優先する
+        let offset: Int? = switch query {
+        case "next": 1
+        case "prev": -1
+        default: nil
+        }
+        if offset == nil {
+            // 間違った名前なら順番待ちせずに失敗させる
+            _ = try SpaceResolver.resolve(query, spaces: spaces, names: store.names)
+        }
+        // 連続で呼ばれた回数だけ運びたいので、next/prev と同じく古い要求を捨てずに順番に送る
+        let queue = GoQueue()
+        _ = try queue.takeTicket()
+        try queue.withRunLock {
+            try GoSocket.requireMoveSupport()
+            try GoSocket.send(GoRequest(query: offset == nil ? query : "", restoreCursor: false,
+                                        offset: offset, wrap: offset == nil ? nil : wrap,
+                                        moveWindow: true, stay: stay))
+        }
     case "rename":
         if flag("--forget") {
             guard let name = args.first else { usage() }
@@ -98,6 +122,9 @@ func usage() -> Never {
                                       Switch to the desktop on the right. --cursor uses the display under the cursor
       deskman prev [--wrap] [--cursor] [--restore-cursor] [--restore-focus]
                                       Switch to the desktop on the left
+      deskman move [--stay] [--wrap] <name|number|UUID|next|prev>
+                                      Move the focused window to another desktop on the same display.
+                                      --stay sends the window and comes back
       deskman rename <target> <name>  "" removes the name
       deskman rename --forget <name>
 
